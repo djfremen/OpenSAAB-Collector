@@ -1,0 +1,50 @@
+OpenSAAB Collector — Data Collection Consent
+
+The OpenSAAB Collector installs two interception libraries (DLL shims)
+into your existing Chipsoft J2534 Pro driver folder:
+
+  - CSTech2Win.dll  (intercepts the Chipsoft D-PDU API used by Tech2Win)
+  - j2534_interface.dll  (intercepts the SAE J2534 PassThru API used
+    by TrionicCANFlasher and other J2534 clients)
+
+The genuine Chipsoft DLLs are not deleted — they are renamed to
+CSTech2Win_real.dll and j2534_interface_real.dll. Our shims forward
+every call to the genuine DLLs and write a log of the calls to your
+%TEMP% folder.
+
+WHAT'S IN THE LOGS:
+  - The CAN-ID, UDS service IDs, and full byte payloads of every
+    diagnostic message Tech2Win or your J2534 client sends or receives
+  - Hardware timestamps from the Chipsoft adapter
+  - Your vehicle's VIN whenever it appears in a diagnostic exchange
+  - SecurityAccess seeds and computed keys used to unlock ECMs
+
+WHAT WE DO WITH UPLOADS (if you opt in):
+  - Captured logs are sent over HTTPS to https://openSAAB.com/ingest/
+  - Logs are stored on the OpenSAAB server, indexed by an anonymous
+    per-install GUID (no email, no name, no phone number)
+  - Logs are used to build the open-source SAAB protocol catalog at
+    https://github.com/djfremen/OpenSAAB
+  - We may publish derived YAML command descriptions and decoded DTC
+    references; raw logs containing your VIN are NOT redistributed
+    publicly without explicit additional consent
+
+YOUR CHOICE:
+  [ ] Yes, I consent to upload captured logs.
+        — Logs upload automatically when Tech2Win / J2534 client closes.
+        — You can pause uploads anytime via the tray icon.
+        — You can uninstall at any time and the genuine Chipsoft DLLs
+          will be restored byte-for-byte.
+
+  [ ] No, install the Collector for local logging only.
+        — Logs still write to %TEMP% (useful for your own debugging).
+        — Nothing is sent over the network.
+        — You can change your mind later via the tray icon.
+
+By clicking "Next" you confirm:
+  - You own or are authorised to operate the vehicle being diagnosed.
+  - You understand that captured logs include your vehicle's VIN and
+    security access exchanges.
+  - You can revoke consent and uninstall the Collector at any time.
+
+Consent version: v1 (2026-05-13)
