@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Win32;
 
 namespace OpenSAAB.Collector.Service;
 
@@ -154,6 +155,19 @@ public sealed class Worker : BackgroundService
             {
                 _log.LogInformation("Uploaded {Path}: {InBytes} → {OutBytes} bytes (gzip)",
                     path, bytes.Length, gzipped.Length);
+                IncrementUploadCount();
+                // Rename .log → .uploaded so we don't re-enqueue on a stray
+                // touch event and so the tray "Upload now" can skip it.
+                try
+                {
+                    var dest = path + ".uploaded";
+                    if (File.Exists(dest)) File.Delete(dest);
+                    File.Move(path, dest);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogDebug(ex, "Could not rename {Path} → .uploaded", path);
+                }
             }
             else
             {
@@ -183,6 +197,19 @@ public sealed class Worker : BackgroundService
             if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
         }
         return false;
+    }
+
+    private static void IncrementUploadCount()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(
+                @"SOFTWARE\OpenSAAB\Collector", writable: true);
+            if (key == null) return;
+            var current = key.GetValue("UploadCount") as int? ?? 0;
+            key.SetValue("UploadCount", current + 1, RegistryValueKind.DWord);
+        }
+        catch { /* counter is best-effort; service must keep running */ }
     }
 
     public override Task StopAsync(CancellationToken cancellationToken)

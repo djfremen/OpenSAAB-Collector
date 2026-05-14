@@ -4,62 +4,85 @@ using Microsoft.Win32;
 namespace OpenSAAB.Collector.Tray;
 
 /// <summary>
-/// Minimal tray-icon app for the OpenSAAB Collector.
+/// Tray-icon app for the OpenSAAB Collector.
 ///
-/// Functions exposed in the right-click context menu:
-///   - Toggle "Upload enabled" (writes HKLM\SOFTWARE\OpenSAAB\Collector\UploadEnabled)
-///   - Open log directory (%TEMP%)
-///   - Show install GUID (read-only, for support / manual contact)
-///   - About
-///   - Exit (closes the tray; service keeps running)
+/// Menu:
+///   - Header: "Captures uploaded: N" (read-only)
+///   - Toggle "Upload enabled"
+///   - "Open live console" (raw color-coded tail)
+///   - "Upload pending logs now" (bypasses the 30 s settle in the service)
+///   - "Open log folder"
+///   - "Show install GUID"
+///   - "About"
+///   - "Exit (service keeps running)"
+///
+/// Decoded console / scapy decoder removed in v0.1.4 — decoding happens
+/// server-side on the uploaded logs. The mission is reliable capture + ship.
 /// </summary>
 internal sealed class TrayApp : ApplicationContext
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
 
     private readonly NotifyIcon _icon;
+    private readonly ToolStripMenuItem _countHeader;
     private readonly ToolStripMenuItem _toggleUpload;
+    private readonly ContextMenuStrip _menu;
     private LogConsoleForm? _consoleForm;
 
     public TrayApp()
     {
-        var menu = new ContextMenuStrip();
+        _menu = new ContextMenuStrip();
+        _menu.Opening += (_, _) => RefreshCountHeader();
+
+        _countHeader = new ToolStripMenuItem(FormatCountHeader(ReadUploadCount()))
+        {
+            Enabled = false,
+        };
+        _menu.Items.Add(_countHeader);
+        _menu.Items.Add(new ToolStripSeparator());
+
         _toggleUpload = new ToolStripMenuItem("Upload enabled", null, OnToggleUpload)
         {
             CheckOnClick = true,
             Checked = ReadUploadEnabled(),
         };
-        menu.Items.Add(_toggleUpload);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
-        menu.Items.Add("Open decoded console (scapy)…", null, (_, _) => OpenDecodedConsole());
-        menu.Items.Add("Open log folder", null, (_, _) =>
+        _menu.Items.Add(_toggleUpload);
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
+        _menu.Items.Add("Upload pending logs now", null, (_, _) => _ = UploadNowAsync());
+        _menu.Items.Add("Open log folder", null, (_, _) =>
         {
             var path = Path.GetTempPath();
             Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
         });
-        menu.Items.Add("Show install GUID", null, (_, _) =>
+        _menu.Items.Add("Show install GUID", null, (_, _) =>
         {
             var id = ReadString("InstallId") ?? "(not set — service may not have started)";
             MessageBox.Show($"OpenSAAB Collector install ID:\n\n{id}\n\nKeep this private.",
                 "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Information);
         });
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("About OpenSAAB", null, (_, _) =>
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add("About OpenSAAB", null, (_, _) =>
         {
             Process.Start(new ProcessStartInfo("https://opensaab.com") { UseShellExecute = true });
         });
-        menu.Items.Add("Exit tray (service keeps running)", null, (_, _) => ExitThread());
+        _menu.Items.Add("Exit tray (service keeps running)", null, (_, _) => ExitThread());
 
         _icon = new NotifyIcon
         {
             Icon = LoadIcon(),
-            ContextMenuStrip = menu,
+            ContextMenuStrip = _menu,
             Visible = true,
             Text = "OpenSAAB Collector",
         };
-        _icon.DoubleClick += (_, _) => menu.Show(Cursor.Position);
+        _icon.DoubleClick += (_, _) => _menu.Show(Cursor.Position);
     }
+
+    private static string FormatCountHeader(int n) =>
+        $"Captures uploaded: {n}";
+
+    private void RefreshCountHeader() =>
+        _countHeader.Text = FormatCountHeader(ReadUploadCount());
 
     private static System.Drawing.Icon LoadIcon()
     {
@@ -84,7 +107,6 @@ internal sealed class TrayApp : ApplicationContext
         {
             MessageBox.Show("Failed to update setting (admin required?):\n\n" + ex.Message,
                 "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            // Revert UI to actual state
             _toggleUpload.Checked = ReadUploadEnabled();
         }
     }
@@ -104,82 +126,61 @@ internal sealed class TrayApp : ApplicationContext
         }
     }
 
-    /// <summary>
-    /// Launches a CMD console that tail-pipes the freshest shim log
-    /// through the bundled scapy-based fremsoft-decoder.exe so the user
-    /// sees decoded UDS service names live (ReadDataByIdentifier 0x90,
-    /// SecurityAccessSeedRequest level=0x0B, etc.) instead of raw hex.
-    ///
-    /// Recognises three log families:
-    ///   cstech2win_shim_*.log  (Tech2Win + real adapter)
-    ///   j2534_shim_*.log       (Trionic / J2534 client + real adapter)
-    ///   fremsoft_*.log         (FremSoft playback/standalone — no adapter)
-    /// </summary>
-    private void OpenDecodedConsole()
+    private async Task UploadNowAsync()
     {
-        var decoderExe = Path.Combine(AppContext.BaseDirectory, "fremsoft-decoder.exe");
-        if (!File.Exists(decoderExe))
+        if (!ReadUploadEnabled())
         {
-            MessageBox.Show(
-                $"fremsoft-decoder.exe not found at\n{decoderExe}\n\n" +
-                "It's bundled by the installer's decoder build step. Re-install with " +
-                "the decoder built (installer\\decoder\\build-decoder.ps1).",
-                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _icon.ShowBalloonTip(4000, "OpenSAAB Collector",
+                "Upload is disabled. Tick \"Upload enabled\" in the menu first.",
+                ToolTipIcon.Warning);
             return;
         }
 
-        var freshest = FindFreshestShimLog();
-        if (freshest == null)
+        var candidates = ManualUploader.FindPendingLogs(Path.GetTempPath());
+        if (candidates.Count == 0)
         {
-            MessageBox.Show(
-                "No active shim log in %TEMP% yet. Launch Tech2Win or your J2534 " +
-                "client first; the shim writes a new log on attach. Re-open this " +
-                "menu after the log appears.",
-                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _icon.ShowBalloonTip(3000, "OpenSAAB Collector",
+                "No pending shim logs found in %TEMP%.",
+                ToolTipIcon.Info);
             return;
         }
 
-        // PowerShell pipes Get-Content -Wait through the decoder. We launch a
-        // fresh CMD window so the user can see the colored output (decoder
-        // honors its own ANSI when stdout is a console).
-        var ps = string.Format(
-            "Get-Content -Wait '{0}' | & '{1}' -",
-            freshest.Replace("'", "''"),
-            decoderExe.Replace("'", "''"));
-        var cmd = $"start \"OpenSAAB decoded console — {Path.GetFileName(freshest)}\" " +
-                  $"powershell -NoProfile -ExecutionPolicy Bypass -Command \"{ps}\"";
+        _icon.ShowBalloonTip(2000, "OpenSAAB Collector",
+            $"Uploading {candidates.Count} log(s)…",
+            ToolTipIcon.Info);
+
+        int ok = 0, fail = 0;
         try
         {
-            Process.Start(new ProcessStartInfo("cmd.exe", "/c " + cmd)
+            var uploader = ManualUploader.FromRegistry();
+            foreach (var path in candidates)
             {
-                UseShellExecute = true,
-                CreateNoWindow = false,
-                WindowStyle = ProcessWindowStyle.Normal,
-            });
+                var success = await uploader.UploadOneAsync(path);
+                if (success)
+                {
+                    ok++;
+                    IncrementUploadCount();
+                }
+                else
+                {
+                    fail++;
+                }
+            }
         }
         catch (Exception ex)
         {
-            MessageBox.Show("Failed to launch decoded console:\n\n" + ex.Message,
-                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _icon.ShowBalloonTip(5000, "OpenSAAB Collector",
+                $"Upload error: {ex.Message}",
+                ToolTipIcon.Error);
+            return;
         }
-    }
 
-    private static string? FindFreshestShimLog()
-    {
-        try
-        {
-            return Directory.EnumerateFiles(Path.GetTempPath(), "*.log")
-                .Where(p =>
-                {
-                    var n = Path.GetFileName(p);
-                    return n.StartsWith("cstech2win_shim_", StringComparison.OrdinalIgnoreCase)
-                        || n.StartsWith("j2534_shim_", StringComparison.OrdinalIgnoreCase)
-                        || n.StartsWith("fremsoft_", StringComparison.OrdinalIgnoreCase);
-                })
-                .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
-                .FirstOrDefault();
-        }
-        catch { return null; }
+        RefreshCountHeader();
+        var icon = fail == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning;
+        var msg = fail == 0
+            ? $"Uploaded {ok} log(s). Captures total: {ReadUploadCount()}."
+            : $"Uploaded {ok} / failed {fail}. Captures total: {ReadUploadCount()}.";
+        _icon.ShowBalloonTip(4000, "OpenSAAB Collector", msg, icon);
     }
 
     private static bool ReadUploadEnabled()
@@ -190,6 +191,28 @@ internal sealed class TrayApp : ApplicationContext
             return (key?.GetValue("UploadEnabled") as int? ?? 0) != 0;
         }
         catch { return false; }
+    }
+
+    private static int ReadUploadCount()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
+            return key?.GetValue("UploadCount") as int? ?? 0;
+        }
+        catch { return 0; }
+    }
+
+    private static void IncrementUploadCount()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
+            var current = key.GetValue("UploadCount") as int? ?? 0;
+            key.SetValue("UploadCount", current + 1, RegistryValueKind.DWord);
+        }
+        catch { /* tray runs unelevated; if write fails the service will still count */ }
     }
 
     private static string? ReadString(string name)
@@ -204,7 +227,11 @@ internal sealed class TrayApp : ApplicationContext
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _icon.Dispose();
+        if (disposing)
+        {
+            _icon.Dispose();
+            _menu.Dispose();
+        }
         base.Dispose(disposing);
     }
 }
