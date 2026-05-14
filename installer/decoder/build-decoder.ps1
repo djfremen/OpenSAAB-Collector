@@ -20,14 +20,15 @@ if (-not (Test-Path $DecoderSrc)) {
 
 Push-Location $ScriptDir
 try {
-    # Prefer 'python' if on PATH; fall back to the Windows 'py' launcher
-    # (handles the case where the MS Store alias intercepts 'python').
-    $py = if (Get-Command python -ErrorAction SilentlyContinue) {
-        'python'
-    } elseif (Get-Command py -ErrorAction SilentlyContinue) {
+    # Prefer the Windows 'py' launcher (canonical, avoids the MS Store
+    # 'python' shim that appears on PATH but isn't a real interpreter).
+    # Fall back to 'python' on non-Windows / older Python distributions.
+    $py = if (Get-Command py -ErrorAction SilentlyContinue) {
         'py'
+    } elseif (Get-Command python -ErrorAction SilentlyContinue) {
+        'python'
     } else {
-        throw "Neither 'python' nor 'py' on PATH. Install Python 3 (winget install Python.Python.3)."
+        throw "Neither 'py' nor 'python' on PATH. Install Python 3 (winget install Python.Python.3)."
     }
 
     Write-Host "== Installing build deps via $py =="
