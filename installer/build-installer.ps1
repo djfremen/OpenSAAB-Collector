@@ -22,11 +22,19 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Tray publish failed' }
 
     Write-Host '== Building installer =='
-    $iscc = Get-Command iscc.exe -ErrorAction SilentlyContinue
-    if (-not $iscc) {
-        throw 'iscc.exe not on PATH. Install Inno Setup 6 from https://jrsoftware.org/isinfo.php and re-run.'
+    # winget installs Inno Setup 6 per-user under $LOCALAPPDATA, not on PATH.
+    # Look for iscc in the standard places before bailing.
+    $isccCandidates = @(
+        (Get-Command iscc.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\iscc.exe",
+        "$env:ProgramFiles\Inno Setup 6\iscc.exe",
+        "${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe"
+    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+    if (-not $isccCandidates) {
+        throw 'iscc.exe not found. Install Inno Setup 6 (winget install JRSoftware.InnoSetup) and re-run.'
     }
-    & iscc.exe installer/opensaab-collector.iss
+    Write-Host "  using iscc: $isccCandidates"
+    & $isccCandidates installer/opensaab-collector.iss
     if ($LASTEXITCODE -ne 0) { throw 'iscc failed' }
 
     $output = Get-ChildItem installer/Output/opensaab-collector-setup-*.exe `
