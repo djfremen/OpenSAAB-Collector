@@ -1,4 +1,4 @@
-# Build fremsoft-decoder.exe — PyInstaller-bundled scapy decoder.
+# Build fremsoft-decoder.exe -- PyInstaller-bundled scapy decoder.
 #
 # Wraps Chipsoft_RE/tools/shim_log_decode.py into a single self-contained
 # Windows exe. Result: one binary, no Python install needed on the target
@@ -15,7 +15,7 @@ $RepoRoot = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 # Source decoder lives in the Chipsoft_RE repo, which is a sibling clone.
 $DecoderSrc = Join-Path (Split-Path -Parent $RepoRoot) 'Chipsoft_RE\tools\shim_log_decode.py'
 if (-not (Test-Path $DecoderSrc)) {
-    throw "Decoder source not found at $DecoderSrc — clone Chipsoft_RE alongside OpenSAAB-Collector."
+    throw "Decoder source not found at $DecoderSrc -- clone Chipsoft_RE alongside OpenSAAB-Collector."
 }
 
 Push-Location $ScriptDir

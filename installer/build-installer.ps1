@@ -22,7 +22,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Tray publish failed' }
 
     Write-Host '== Building bundled scapy decoder =='
-    # Optional — if Python isn't on PATH we skip with a warning. Installer
+    # Optional -- if Python isn't on PATH we skip with a warning. Installer
     # has skipifsourcedoesntexist on the decoder Source line.
     if ((Get-Command python -ErrorAction SilentlyContinue) -or
         (Get-Command py     -ErrorAction SilentlyContinue)) {
