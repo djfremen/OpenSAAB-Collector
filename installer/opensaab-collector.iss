@@ -75,6 +75,7 @@ Source: "consent.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\OpenSAAB Collector Tray"; Filename: "{app}\OpenSAAB.Collector.Tray.exe"
+Name: "{group}\Uninstall OpenSAAB Collector"; Filename: "{uninstallexe}"; Comment: "Stops the service, restores the genuine Chipsoft DLLs, removes everything"
 Name: "{userstartup}\OpenSAAB Collector Tray"; Filename: "{app}\OpenSAAB.Collector.Tray.exe"
 
 [Tasks]

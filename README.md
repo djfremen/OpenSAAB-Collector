@@ -55,6 +55,29 @@ The installer expects the shimmed DLLs to be present at
 `..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll` — build those
 in the Chipsoft_RE repo first.
 
+## Uninstall
+
+Three equivalent paths — pick whichever:
+
+1. **Start Menu** → "OpenSAAB Collector" group → "Uninstall OpenSAAB
+   Collector" (shortcut added by the v0.1.2+ installer).
+2. **Settings → Apps → Installed apps** → search for "OpenSAAB
+   Collector" → "Uninstall."
+3. **Run directly:** `C:\Program Files\OpenSAAB\Collector\unins000.exe`
+   (or wherever you installed). UAC prompts for admin.
+
+In every case the uninstaller:
+- Stops + deletes the `OpenSAABCollector` Windows Service.
+- Kills the tray app if running.
+- **Restores the genuine Chipsoft DLLs byte-for-byte** from the
+  `*_real.dll` backups created at install time.
+- Removes installed files + the `HKLM\SOFTWARE\OpenSAAB\Collector\`
+  registry tree.
+
+After uninstall, your Chipsoft J2534 Pro install is exactly as it was
+before the Collector touched it. Tech2Win and any J2534 client behave
+identically.
+
 ## Privacy
 
 - **Opt-in.** Logs stay local by default. Upload requires explicit
