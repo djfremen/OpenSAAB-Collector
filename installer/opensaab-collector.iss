@@ -10,7 +10,7 @@
 ;                         ..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.1.4"
+#define AppVersion     "0.1.5"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"
@@ -76,7 +76,9 @@ Name: "consentupload"; Description: "Upload captured logs to openSAAB.com (recom
 ; ConsentVersion is set whichever way the user goes — even local-only
 ; users acknowledged the disclosure.
 Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName: "ConsentVersion"; ValueData: "v1"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName: "IngestUrl"; ValueData: "https://openSAAB.com/ingest/shim-log"
+; openSAAB.com DNS hasn't been pointed at the Koyeb deployment yet — until
+; that lands, ship the Koyeb domain directly so fresh installs don't 404.
+Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName: "IngestUrl"; ValueData: "https://relevant-diann-djfremen2-c013cdc3.koyeb.app/ingest/shim-log"
 ; UploadEnabled mirrors the consentupload task — written via [Code] below.
 
 [Run]
@@ -129,6 +131,7 @@ Filename: "{cmd}"; \
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ChipsoftCs, ChipsoftJ: String;
+  RC: Integer;
 begin
   Result := '';
   ChipsoftCs := ExpandConstant('{#ChipsoftDir}\CSTech2Win.dll');
@@ -143,6 +146,13 @@ begin
               'OpenSAAB Collector requires a working Chipsoft J2534 Pro install.';
     Exit;
   end;
+  // Stop the previous Collector so its tray.exe and service.exe stop
+  // holding their own files open. Restart Manager often misses the
+  // unelevated tray, leaving the user staring at "Setup was unable to
+  // automatically close all applications" mid-upgrade.
+  Exec(ExpandConstant('{cmd}'),
+       '/c sc stop {#ServiceName} >nul 2>&1 & taskkill /F /IM OpenSAAB.Collector.Tray.exe >nul 2>&1',
+       '', SW_HIDE, ewWaitUntilTerminated, RC);
 end;
 
 procedure NoOp;

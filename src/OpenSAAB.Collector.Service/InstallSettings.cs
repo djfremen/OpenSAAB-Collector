@@ -14,12 +14,12 @@ public sealed class InstallSettings
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
 
     public string InstallId { get; init; } = string.Empty;
-    public string IngestUrl { get; init; } = "https://openSAAB.com/ingest/shim-log";
+    public string IngestUrl { get; init; } = "https://relevant-diann-djfremen2-c013cdc3.koyeb.app/ingest/shim-log";
     public bool UploadEnabled { get; set; }
     public string ConsentVersion { get; set; } = string.Empty;
     public string? VehicleYear { get; set; }
     public string? VehicleModel { get; set; }
-    public string CollectorVersion => "0.1.4";
+    public string CollectorVersion => "0.1.5";
 
     public static InstallSettings Load()
     {

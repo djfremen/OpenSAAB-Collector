@@ -17,7 +17,7 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.1.4";
+    private const string CollectorVersion = "0.1.5";
 
     private static readonly string[] LogPrefixes =
     {
