@@ -10,7 +10,7 @@
 ;                         ..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.1.6"
+#define AppVersion     "0.1.7"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"
@@ -51,9 +51,12 @@ Source: "..\..\Chipsoft_RE\shim\cstech2win\build\CSTech2Win.dll"; \
     DestDir: "{#ChipsoftDir}"; DestName: "CSTech2Win.dll"; \
     Flags: ignoreversion uninsneveruninstall
 
-Source: "..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll"; \
-    DestDir: "{#ChipsoftDir}"; DestName: "j2534_interface.dll"; \
-    Flags: ignoreversion uninsneveruninstall
+; v0.1.7: j2534_interface.dll shim removed from default install. Tech2Win
+; uses CSTech2Win.dll (D-PDU API), not j2534_interface.dll, so the j2534
+; shim sat idle for the median contributor — only TrionicCANFlasher /
+; OpenPort users would benefit. Strip-down keeps the install lean and
+; avoids one more Restart Manager corner case. Source still lives in
+; Chipsoft_RE/shim/j2534/ for advanced users who want to swap manually.
 
 ; Service + tray go to {app} (Program Files\OpenSAAB\Collector).
 Source: "..\src\OpenSAAB.Collector.Service\bin\Release\net8.0\win-x64\publish\OpenSAAB.Collector.Service.exe"; \
@@ -80,6 +83,10 @@ Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName:
 ; that lands, ship the Koyeb domain directly so fresh installs don't 404.
 Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName: "IngestUrl"; ValueData: "https://relevant-diann-djfremen2-c013cdc3.koyeb.app/ingest/shim-log"
 ; UploadEnabled mirrors the consentupload task — written via [Code] below.
+; UploadCount: pre-create with users-modify so the unelevated tray can
+; increment it after each successful upload (v0.1.7 fix; previously the
+; tray's IncrementUploadCount silently failed on HKLM permission denied).
+Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: dword; ValueName: "UploadCount"; ValueData: "0"; Permissions: users-modify; Flags: uninsdeletevalue createvalueifdoesntexist
 
 [Run]
 ; --- Pre-install: refuse if Chipsoft isn't there. Done in [Code] PrepareToInstall. ---
@@ -92,10 +99,7 @@ Filename: "{cmd}"; \
     Flags: runhidden waituntilterminated; \
     BeforeInstall: NoOp
 
-Filename: "{cmd}"; \
-    Parameters: "/c if not exist ""{#ChipsoftDir}\j2534_interface_real.dll"" move /Y ""{#ChipsoftDir}\j2534_interface.dll"" ""{#ChipsoftDir}\j2534_interface_real.dll"""; \
-    StatusMsg: "Backing up genuine j2534_interface.dll…"; \
-    Flags: runhidden waituntilterminated
+; v0.1.7: j2534 backup step removed alongside the shim drop.
 
 ; Install + start the Windows Service.
 Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= ""\""{app}\OpenSAAB.Collector.Service.exe\"""" start= auto DisplayName= ""OpenSAAB Collector"""; \
@@ -123,6 +127,8 @@ Filename: "{cmd}"; Parameters: "/c taskkill /IM OpenSAAB.Collector.Tray.exe /F >
 Filename: "{cmd}"; \
     Parameters: "/c if exist ""{#ChipsoftDir}\CSTech2Win_real.dll"" (del /Q ""{#ChipsoftDir}\CSTech2Win.dll"" & move /Y ""{#ChipsoftDir}\CSTech2Win_real.dll"" ""{#ChipsoftDir}\CSTech2Win.dll"")"; \
     Flags: runhidden waituntilterminated
+; v0.1.7: also restore the genuine j2534_interface.dll if a previous Collector
+; (≤ v0.1.6) had backed it up — keeps uninstall idempotent across versions.
 Filename: "{cmd}"; \
     Parameters: "/c if exist ""{#ChipsoftDir}\j2534_interface_real.dll"" (del /Q ""{#ChipsoftDir}\j2534_interface.dll"" & move /Y ""{#ChipsoftDir}\j2534_interface_real.dll"" ""{#ChipsoftDir}\j2534_interface.dll"")"; \
     Flags: runhidden waituntilterminated
@@ -152,6 +158,15 @@ begin
   // automatically close all applications" mid-upgrade.
   Exec(ExpandConstant('{cmd}'),
        '/c sc stop {#ServiceName} >nul 2>&1 & taskkill /F /IM OpenSAAB.Collector.Tray.exe >nul 2>&1',
+       '', SW_HIDE, ewWaitUntilTerminated, RC);
+  // v0.1.7: Tech2Win's diagnostic engine (emulator.exe) often stays running
+  // headless after the GUI window closes, holding our shim DLL open. Restart
+  // Manager's WM_CLOSE doesn't reach a windowless process, so installs hang on
+  // "files in use." Kill ONLY orphaned (no MainWindowTitle) emulator.exe
+  // instances; leave alone any with a visible window so an active Tech2Win
+  // session still gets the polite Restart Manager prompt.
+  Exec(ExpandConstant('{cmd}'),
+       '/c powershell -NoProfile -Command "Get-Process -Name emulator -ErrorAction SilentlyContinue | Where-Object { [string]::IsNullOrEmpty($_.MainWindowTitle) } | Stop-Process -Force -ErrorAction SilentlyContinue"',
        '', SW_HIDE, ewWaitUntilTerminated, RC);
 end;
 
