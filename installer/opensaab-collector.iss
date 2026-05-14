@@ -10,7 +10,7 @@
 ;                         ..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.1.0"
+#define AppVersion     "0.1.1"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"

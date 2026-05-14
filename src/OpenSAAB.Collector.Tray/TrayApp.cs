@@ -19,6 +19,7 @@ internal sealed class TrayApp : ApplicationContext
 
     private readonly NotifyIcon _icon;
     private readonly ToolStripMenuItem _toggleUpload;
+    private LogConsoleForm? _consoleForm;
 
     public TrayApp()
     {
@@ -30,6 +31,7 @@ internal sealed class TrayApp : ApplicationContext
         };
         menu.Items.Add(_toggleUpload);
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
         menu.Items.Add("Open log folder", null, (_, _) =>
         {
             var path = Path.GetTempPath();
@@ -83,6 +85,21 @@ internal sealed class TrayApp : ApplicationContext
                 "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             // Revert UI to actual state
             _toggleUpload.Checked = ReadUploadEnabled();
+        }
+    }
+
+    private void OpenLiveConsole()
+    {
+        if (_consoleForm == null || _consoleForm.IsDisposed)
+        {
+            _consoleForm = new LogConsoleForm();
+            _consoleForm.Show();
+        }
+        else
+        {
+            if (_consoleForm.WindowState == FormWindowState.Minimized)
+                _consoleForm.WindowState = FormWindowState.Normal;
+            _consoleForm.Activate();
         }
     }
 
