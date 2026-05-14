@@ -24,7 +24,8 @@ try {
     Write-Host '== Building bundled scapy decoder =='
     # Optional — if Python isn't on PATH we skip with a warning. Installer
     # has skipifsourcedoesntexist on the decoder Source line.
-    if (Get-Command python -ErrorAction SilentlyContinue) {
+    if ((Get-Command python -ErrorAction SilentlyContinue) -or
+        (Get-Command py     -ErrorAction SilentlyContinue)) {
         & powershell -NoProfile -ExecutionPolicy Bypass -File installer/decoder/build-decoder.ps1
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "decoder build failed; installer will ship without fremsoft-decoder.exe"

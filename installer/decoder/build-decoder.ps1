@@ -20,14 +20,24 @@ if (-not (Test-Path $DecoderSrc)) {
 
 Push-Location $ScriptDir
 try {
-    Write-Host "== Installing build deps =="
-    python -m pip install --upgrade pip pyinstaller scapy
+    # Prefer 'python' if on PATH; fall back to the Windows 'py' launcher
+    # (handles the case where the MS Store alias intercepts 'python').
+    $py = if (Get-Command python -ErrorAction SilentlyContinue) {
+        'python'
+    } elseif (Get-Command py -ErrorAction SilentlyContinue) {
+        'py'
+    } else {
+        throw "Neither 'python' nor 'py' on PATH. Install Python 3 (winget install Python.Python.3)."
+    }
+
+    Write-Host "== Installing build deps via $py =="
+    & $py -m pip install --upgrade pip pyinstaller scapy
     if ($LASTEXITCODE -ne 0) { throw 'pip install failed' }
 
-    Write-Host "== Building fremsoft-decoder.exe =="
+    Write-Host "== Building fremsoft-decoder.exe via $py =="
     # --onefile: single exe; --console: keep stdout for the tail pipe;
     # --hidden-import covers scapy's lazy contrib imports.
-    python -m PyInstaller `
+    & $py -m PyInstaller `
         --onefile `
         --console `
         --name fremsoft-decoder `
