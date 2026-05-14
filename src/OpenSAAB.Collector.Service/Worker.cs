@@ -156,17 +156,25 @@ public sealed class Worker : BackgroundService
                 _log.LogInformation("Uploaded {Path}: {InBytes} → {OutBytes} bytes (gzip)",
                     path, bytes.Length, gzipped.Length);
                 IncrementUploadCount();
-                // Rename .log → .uploaded so we don't re-enqueue on a stray
-                // touch event and so the tray "Upload now" can skip it.
+                // Server has it on R2 — drop the local copy so it can never
+                // ship twice. If delete fails (e.g. another process holds an
+                // open handle), fall back to renaming.
                 try
                 {
-                    var dest = path + ".uploaded";
-                    if (File.Exists(dest)) File.Delete(dest);
-                    File.Move(path, dest);
+                    File.Delete(path);
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    _log.LogDebug(ex, "Could not rename {Path} → .uploaded", path);
+                    try
+                    {
+                        var dest = path + ".uploaded";
+                        if (File.Exists(dest)) File.Delete(dest);
+                        File.Move(path, dest);
+                    }
+                    catch (Exception ex2)
+                    {
+                        _log.LogDebug(ex2, "Could not remove {Path} after upload", path);
+                    }
                 }
             }
             else

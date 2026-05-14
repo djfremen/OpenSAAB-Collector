@@ -22,8 +22,13 @@ namespace OpenSAAB.Collector.Tray;
 internal sealed class TrayApp : ApplicationContext
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
+    private const string ServiceName = "OpenSAABCollector";
+
+    private static string AppVersion =>
+        typeof(TrayApp).Assembly.GetName().Version?.ToString(3) ?? "?";
 
     private readonly NotifyIcon _icon;
+    private readonly ToolStripMenuItem _versionHeader;
     private readonly ToolStripMenuItem _countHeader;
     private readonly ToolStripMenuItem _toggleUpload;
     private readonly ContextMenuStrip _menu;
@@ -33,6 +38,12 @@ internal sealed class TrayApp : ApplicationContext
     {
         _menu = new ContextMenuStrip();
         _menu.Opening += (_, _) => RefreshCountHeader();
+
+        _versionHeader = new ToolStripMenuItem($"OpenSAAB Collector  v{AppVersion}")
+        {
+            Enabled = false,
+        };
+        _menu.Items.Add(_versionHeader);
 
         _countHeader = new ToolStripMenuItem(FormatCountHeader(ReadUploadCount()))
         {
@@ -58,7 +69,7 @@ internal sealed class TrayApp : ApplicationContext
         _menu.Items.Add("Show install GUID", null, (_, _) =>
         {
             var id = ReadString("InstallId") ?? "(not set — service may not have started)";
-            MessageBox.Show($"OpenSAAB Collector install ID:\n\n{id}\n\nKeep this private.",
+            MessageBox.Show($"OpenSAAB Collector v{AppVersion}\nInstall ID:\n\n{id}\n\nKeep this private.",
                 "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Information);
         });
         _menu.Items.Add(new ToolStripSeparator());
@@ -67,13 +78,14 @@ internal sealed class TrayApp : ApplicationContext
             Process.Start(new ProcessStartInfo("https://opensaab.com") { UseShellExecute = true });
         });
         _menu.Items.Add("Exit tray (service keeps running)", null, (_, _) => DoExit());
+        _menu.Items.Add("Stop service && exit (full shutdown)", null, (_, _) => DoStopAll());
 
         _icon = new NotifyIcon
         {
             Icon = LoadIcon(),
             ContextMenuStrip = _menu,
             Visible = true,
-            Text = "OpenSAAB Collector",
+            Text = $"OpenSAAB Collector v{AppVersion}",
         };
         _icon.DoubleClick += (_, _) => _menu.Show(Cursor.Position);
     }
@@ -242,6 +254,34 @@ internal sealed class TrayApp : ApplicationContext
         try { _menu.Dispose(); } catch { }
         Application.Exit();
         Environment.Exit(0);
+    }
+
+    /// <summary>
+    /// "Stop service & exit (full shutdown)". Tray runs unelevated; sc.exe
+    /// stop requires admin. Launch via Verb=runas so UAC prompts the user;
+    /// if they decline, we still exit the tray (service stays running and
+    /// they can stop it manually later from an admin shell).
+    /// </summary>
+    private void DoStopAll()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("sc.exe", $"stop {ServiceName}")
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                CreateNoWindow = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+            };
+            using var p = Process.Start(psi);
+            p?.WaitForExit(8000);
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // User declined UAC, or sc.exe couldn't launch. Exit tray anyway.
+        }
+        catch { }
+        DoExit();
     }
 
     protected override void Dispose(bool disposing)

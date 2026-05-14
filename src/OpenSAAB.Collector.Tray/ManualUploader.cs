@@ -17,7 +17,7 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.1.5";
+    private const string CollectorVersion = "0.1.6";
 
     private static readonly string[] LogPrefixes =
     {
@@ -145,15 +145,25 @@ internal sealed class ManualUploader
             return false;
         }
 
-        // Rename .log → .uploaded so the service's FileSystemWatcher (pattern
-        // *.log) ignores the file on its next settle pass. Best-effort.
+        // Server has it — drop the local copy so the same log can never ship
+        // twice. If delete fails (file still held open by an active Tech2Win
+        // shim session in %TEMP%), fall back to renaming so the next "Upload
+        // now" pass skips it. v0.1.6: server-side persistence is on R2 now,
+        // so client deletion is safe.
         try
         {
-            var dest = path + ".uploaded";
-            if (File.Exists(dest)) File.Delete(dest);
-            File.Move(path, dest);
+            File.Delete(path);
         }
-        catch { /* rename racing with the shim's append is fine — server dedupes */ }
+        catch
+        {
+            try
+            {
+                var dest = path + ".uploaded";
+                if (File.Exists(dest)) File.Delete(dest);
+                File.Move(path, dest);
+            }
+            catch { /* worst case: re-upload next pass; server dedupes by wall_ms */ }
+        }
 
         return true;
     }
