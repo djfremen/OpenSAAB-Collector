@@ -12,18 +12,15 @@
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <Version>0.1.0</Version>
-    <ApplicationIcon>app.ico</ApplicationIcon>
     <NoWin32Manifest>false</NoWin32Manifest>
+    <!-- ApplicationIcon intentionally omitted; tray code falls back to
+         SystemIcons.Information at runtime. Drop an app.ico into this
+         folder later and re-add <ApplicationIcon>app.ico</ApplicationIcon>
+         to brand the .exe. -->
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="app.ico" Condition="Exists('app.ico')">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
 </Project>
