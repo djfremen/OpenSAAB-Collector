@@ -10,7 +10,7 @@
 ;                         ..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.1.3"
+#define AppVersion     "0.1.2"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"
@@ -73,22 +73,8 @@ Source: "decoder\NOTICE.md"; DestDir: "{app}"; \
 
 Source: "consent.txt"; DestDir: "{app}"; Flags: ignoreversion
 
-; FremSoft playback recordings — bundled alongside the installer so users
-; can flip into playback mode without finding a JSON file. The default
-; recording is today's bench Check Codes capture; more get added as the
-; community contributes.
-Source: "..\..\Chipsoft_RE\fremsoft\recordings\*.json"; \
-    DestDir: "{app}\recordings"; Flags: ignoreversion skipifsourcedoesntexist
-
-; One-click cmd files that flip HKLM\SOFTWARE\OpenSAAB\Collector\Mode
-; between record and playback. Both prompt for UAC on first run.
-Source: "fremsoft\enable-playback.cmd"; DestDir: "{app}"; Flags: ignoreversion
-Source: "fremsoft\enable-record.cmd";   DestDir: "{app}"; Flags: ignoreversion
-
 [Icons]
 Name: "{group}\OpenSAAB Collector Tray"; Filename: "{app}\OpenSAAB.Collector.Tray.exe"
-Name: "{group}\FremSoft — Enable Playback Mode"; Filename: "{app}\enable-playback.cmd"; Comment: "Switch to playback: Tech2Win sees a recording instead of a real ECM. UAC prompts."
-Name: "{group}\FremSoft — Enable Record Mode (default)"; Filename: "{app}\enable-record.cmd"; Comment: "Switch back to record: Tech2Win talks to the real ECM via the Chipsoft adapter."
 Name: "{group}\Uninstall OpenSAAB Collector"; Filename: "{uninstallexe}"; Comment: "Stops the service, restores the genuine Chipsoft DLLs, removes everything"
 Name: "{userstartup}\OpenSAAB Collector Tray"; Filename: "{app}\OpenSAAB.Collector.Tray.exe"
 
