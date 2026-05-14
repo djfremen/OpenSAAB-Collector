@@ -66,7 +66,7 @@ internal sealed class TrayApp : ApplicationContext
         {
             Process.Start(new ProcessStartInfo("https://opensaab.com") { UseShellExecute = true });
         });
-        _menu.Items.Add("Exit tray (service keeps running)", null, (_, _) => ExitThread());
+        _menu.Items.Add("Exit tray (service keeps running)", null, (_, _) => DoExit());
 
         _icon = new NotifyIcon
         {
@@ -223,6 +223,25 @@ internal sealed class TrayApp : ApplicationContext
             return key?.GetValue(name) as string;
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// Tear down all visible state and force-terminate. ApplicationContext.ExitThread()
+    /// only signals the message loop to exit; it doesn't kill background threads
+    /// (HttpClient connection pools, FileSystemWatcher completion ports, in-flight
+    /// upload Tasks, the LogConsoleForm's UI thread). When any of those are alive,
+    /// the process stays in the background and the only recourse is Task Manager.
+    /// "Exit" should mean exit, so we also call Environment.Exit(0).
+    /// </summary>
+    private void DoExit()
+    {
+        try { _consoleForm?.Close(); } catch { }
+        try { _consoleForm?.Dispose(); } catch { }
+        try { _icon.Visible = false; } catch { }   // remove from tray immediately
+        try { _icon.Dispose(); } catch { }
+        try { _menu.Dispose(); } catch { }
+        Application.Exit();
+        Environment.Exit(0);
     }
 
     protected override void Dispose(bool disposing)
