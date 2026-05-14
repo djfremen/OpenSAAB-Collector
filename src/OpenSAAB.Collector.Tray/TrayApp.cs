@@ -32,6 +32,7 @@ internal sealed class TrayApp : ApplicationContext
         menu.Items.Add(_toggleUpload);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
+        menu.Items.Add("Open decoded console (scapy)…", null, (_, _) => OpenDecodedConsole());
         menu.Items.Add("Open log folder", null, (_, _) =>
         {
             var path = Path.GetTempPath();
@@ -101,6 +102,84 @@ internal sealed class TrayApp : ApplicationContext
                 _consoleForm.WindowState = FormWindowState.Normal;
             _consoleForm.Activate();
         }
+    }
+
+    /// <summary>
+    /// Launches a CMD console that tail-pipes the freshest shim log
+    /// through the bundled scapy-based fremsoft-decoder.exe so the user
+    /// sees decoded UDS service names live (ReadDataByIdentifier 0x90,
+    /// SecurityAccessSeedRequest level=0x0B, etc.) instead of raw hex.
+    ///
+    /// Recognises three log families:
+    ///   cstech2win_shim_*.log  (Tech2Win + real adapter)
+    ///   j2534_shim_*.log       (Trionic / J2534 client + real adapter)
+    ///   fremsoft_*.log         (FremSoft playback/standalone — no adapter)
+    /// </summary>
+    private void OpenDecodedConsole()
+    {
+        var decoderExe = Path.Combine(AppContext.BaseDirectory, "fremsoft-decoder.exe");
+        if (!File.Exists(decoderExe))
+        {
+            MessageBox.Show(
+                $"fremsoft-decoder.exe not found at\n{decoderExe}\n\n" +
+                "It's bundled by the installer's decoder build step. Re-install with " +
+                "the decoder built (installer\\decoder\\build-decoder.ps1).",
+                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        var freshest = FindFreshestShimLog();
+        if (freshest == null)
+        {
+            MessageBox.Show(
+                "No active shim log in %TEMP% yet. Launch Tech2Win or your J2534 " +
+                "client first; the shim writes a new log on attach. Re-open this " +
+                "menu after the log appears.",
+                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        // PowerShell pipes Get-Content -Wait through the decoder. We launch a
+        // fresh CMD window so the user can see the colored output (decoder
+        // honors its own ANSI when stdout is a console).
+        var ps = string.Format(
+            "Get-Content -Wait '{0}' | & '{1}' -",
+            freshest.Replace("'", "''"),
+            decoderExe.Replace("'", "''"));
+        var cmd = $"start \"OpenSAAB decoded console — {Path.GetFileName(freshest)}\" " +
+                  $"powershell -NoProfile -ExecutionPolicy Bypass -Command \"{ps}\"";
+        try
+        {
+            Process.Start(new ProcessStartInfo("cmd.exe", "/c " + cmd)
+            {
+                UseShellExecute = true,
+                CreateNoWindow = false,
+                WindowStyle = ProcessWindowStyle.Normal,
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Failed to launch decoded console:\n\n" + ex.Message,
+                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private static string? FindFreshestShimLog()
+    {
+        try
+        {
+            return Directory.EnumerateFiles(Path.GetTempPath(), "*.log")
+                .Where(p =>
+                {
+                    var n = Path.GetFileName(p);
+                    return n.StartsWith("cstech2win_shim_", StringComparison.OrdinalIgnoreCase)
+                        || n.StartsWith("j2534_shim_", StringComparison.OrdinalIgnoreCase)
+                        || n.StartsWith("fremsoft_", StringComparison.OrdinalIgnoreCase);
+                })
+                .OrderByDescending(p => File.GetLastWriteTimeUtc(p))
+                .FirstOrDefault();
+        }
+        catch { return null; }
     }
 
     private static bool ReadUploadEnabled()

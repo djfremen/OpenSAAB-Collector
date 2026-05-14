@@ -10,7 +10,7 @@
 ;                         ..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.1.1"
+#define AppVersion     "0.1.2"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"
@@ -61,6 +61,15 @@ Source: "..\src\OpenSAAB.Collector.Service\bin\Release\net8.0\win-x64\publish\Op
 
 Source: "..\src\OpenSAAB.Collector.Tray\bin\Release\net8.0-windows\win-x64\publish\OpenSAAB.Collector.Tray.exe"; \
     DestDir: "{app}"; Flags: ignoreversion
+
+; Bundled scapy decoder (PyInstaller of Chipsoft_RE/tools/shim_log_decode.py).
+; Built separately via installer\decoder\build-decoder.ps1. Inherits scapy's
+; GPL-2.0; aggregated alongside the Apache 2.0 Collector binaries — see
+; installer\decoder\NOTICE.md for the licensing rationale.
+Source: "decoder\Output\fremsoft-decoder.exe"; \
+    DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "decoder\NOTICE.md"; DestDir: "{app}"; \
+    DestName: "fremsoft-decoder-NOTICE.md"; Flags: ignoreversion skipifsourcedoesntexist
 
 Source: "consent.txt"; DestDir: "{app}"; Flags: ignoreversion
 

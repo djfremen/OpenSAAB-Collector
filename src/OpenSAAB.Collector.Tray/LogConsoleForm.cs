@@ -18,7 +18,13 @@ namespace OpenSAAB.Collector.Tray;
 internal sealed class LogConsoleForm : Form
 {
     private const int MaxLines = 5000;
-    private static readonly string[] LogPrefixes = ["cstech2win_shim_", "j2534_shim_"];
+    // Three log families:
+    //   cstech2win_shim_*  — Tech2Win + real adapter
+    //   j2534_shim_*       — J2534 client + real adapter
+    //   fremsoft_*         — FremSoft playback/standalone (no adapter)
+    private static readonly string[] LogPrefixes = [
+        "cstech2win_shim_", "j2534_shim_", "fremsoft_"
+    ];
 
     private readonly RichTextBox _box;
     private readonly Label _statusLabel;

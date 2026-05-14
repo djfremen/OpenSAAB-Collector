@@ -15,10 +15,17 @@ the protocol catalog at <https://github.com/djfremen/OpenSAAB>.
    - `CSTech2Win.dll` (replaces the genuine; backup at `CSTech2Win_real.dll`)
    - `j2534_interface.dll` (replaces the genuine; backup at `j2534_interface_real.dll`)
 2. A Windows Service `OpenSAABCollector` that watches `%TEMP%\` for
-   `cstech2win_shim_*.log` and `j2534_shim_*.log`, gzips them on
-   rotation, and POSTs to `https://openSAAB.com/ingest/shim-log`.
-3. A tray app for pause / resume / open-log-dir / preview-next-upload.
-4. A registry-backed install state at `HKLM\SOFTWARE\OpenSAAB\Collector\`
+   `cstech2win_shim_*.log`, `j2534_shim_*.log`, and `fremsoft_*.log`,
+   gzips them on rotation, and POSTs to `https://openSAAB.com/ingest/shim-log`.
+3. A tray app: pause/resume upload, open log folder, **live console**
+   (raw color-coded), **decoded console** (live scapy dissection),
+   show install GUID.
+4. `fremsoft-decoder.exe` — PyInstaller-bundled scapy/UDS dissector
+   that the tray pipes the freshest log through. **GPL-2.0** (scapy);
+   shipped as a separate process — see
+   [`installer/decoder/NOTICE.md`](installer/decoder/NOTICE.md) for the
+   licensing rationale. The other binaries remain Apache 2.0.
+5. A registry-backed install state at `HKLM\SOFTWARE\OpenSAAB\Collector\`
    holding the per-install GUID, opt-in flag, and (optional) vehicle
    profile.
 

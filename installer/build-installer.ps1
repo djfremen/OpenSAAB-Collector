@@ -21,6 +21,18 @@ try {
         -p:DebugType=embedded
     if ($LASTEXITCODE -ne 0) { throw 'Tray publish failed' }
 
+    Write-Host '== Building bundled scapy decoder =='
+    # Optional — if Python isn't on PATH we skip with a warning. Installer
+    # has skipifsourcedoesntexist on the decoder Source line.
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File installer/decoder/build-decoder.ps1
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "decoder build failed; installer will ship without fremsoft-decoder.exe"
+        }
+    } else {
+        Write-Warning "python not on PATH; skipping decoder build (installer will ship without fremsoft-decoder.exe)"
+    }
+
     Write-Host '== Building installer =='
     # winget installs Inno Setup 6 per-user under $LOCALAPPDATA, not on PATH.
     # Look for iscc in the standard places before bailing.
