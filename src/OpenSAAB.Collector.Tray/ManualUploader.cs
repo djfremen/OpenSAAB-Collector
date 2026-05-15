@@ -17,7 +17,18 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.1.7";
+    private const string CollectorVersion = "0.1.8";
+
+    /// <summary>Per-file outcome of <see cref="UploadOneAsync"/>.</summary>
+    internal enum UploadResult
+    {
+        /// <summary>Server accepted the upload (2xx); file deleted locally.</summary>
+        Uploaded,
+        /// <summary>Server rejected as low-value noise (HTTP 422); file deleted locally — don't retry, don't count as an upload.</summary>
+        LowValueDeleted,
+        /// <summary>Transient or unknown error; file kept for the next pass.</summary>
+        Failed,
+    }
 
     private static readonly string[] LogPrefixes =
     {
@@ -91,7 +102,7 @@ internal sealed class ManualUploader
         return results;
     }
 
-    public async Task<bool> UploadOneAsync(string path)
+    public async Task<UploadResult> UploadOneAsync(string path)
     {
         byte[] bytes;
         try
@@ -105,9 +116,9 @@ internal sealed class ManualUploader
         }
         catch
         {
-            return false;
+            return UploadResult.Failed;
         }
-        if (bytes.Length == 0) return false;
+        if (bytes.Length == 0) return UploadResult.Failed;
 
         byte[] gzipped;
         using (var ms = new MemoryStream())
@@ -135,21 +146,39 @@ internal sealed class ManualUploader
         if (!string.IsNullOrEmpty(_vehicleYear)) req.Headers.Add("X-Vehicle-Year", _vehicleYear);
         if (!string.IsNullOrEmpty(_vehicleModel)) req.Headers.Add("X-Vehicle-Model", _vehicleModel);
 
+        bool acceptedAsLowValue = false;
         try
         {
             using var resp = await Http.SendAsync(req);
-            if (!resp.IsSuccessStatusCode) return false;
+            if (!resp.IsSuccessStatusCode)
+            {
+                // Server-side low-value gate (Layer 2): the capture contained
+                // no analytically interesting UDS traffic — typically a single
+                // TesterPresent frame on $0101. Treat as terminal so we delete
+                // locally and don't loop forever uploading the same noise.
+                // Server response body looks like:
+                //   {"detail":{"reason":"low_value_capture", ...}}
+                if (resp.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
+                {
+                    var body = await resp.Content.ReadAsStringAsync();
+                    if (body.Contains("low_value_capture", StringComparison.Ordinal))
+                    {
+                        acceptedAsLowValue = true;
+                    }
+                }
+                if (!acceptedAsLowValue) return UploadResult.Failed;
+            }
         }
         catch
         {
-            return false;
+            return UploadResult.Failed;
         }
 
-        // Server has it — drop the local copy so the same log can never ship
-        // twice. If delete fails (file still held open by an active Tech2Win
-        // shim session in %TEMP%), fall back to renaming so the next "Upload
-        // now" pass skips it. v0.1.6: server-side persistence is on R2 now,
-        // so client deletion is safe.
+        // Server has it (or rejected it as noise) — drop the local copy so the
+        // same log can never ship twice. If delete fails (file still held open
+        // by an active Tech2Win shim session in %TEMP%), fall back to renaming
+        // so the next "Upload now" pass skips it. v0.1.6: server-side
+        // persistence is on R2 now, so client deletion is safe.
         try
         {
             File.Delete(path);
@@ -165,6 +194,6 @@ internal sealed class ManualUploader
             catch { /* worst case: re-upload next pass; server dedupes by wall_ms */ }
         }
 
-        return true;
+        return acceptedAsLowValue ? UploadResult.LowValueDeleted : UploadResult.Uploaded;
     }
 }

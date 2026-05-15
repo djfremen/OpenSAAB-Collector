@@ -19,7 +19,7 @@ public sealed class InstallSettings
     public string ConsentVersion { get; set; } = string.Empty;
     public string? VehicleYear { get; set; }
     public string? VehicleModel { get; set; }
-    public string CollectorVersion => "0.1.7";
+    public string CollectorVersion => "0.1.8";
 
     public static InstallSettings Load()
     {

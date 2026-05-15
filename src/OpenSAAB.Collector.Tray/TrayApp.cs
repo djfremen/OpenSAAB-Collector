@@ -161,21 +161,29 @@ internal sealed class TrayApp : ApplicationContext
             $"Uploading {candidates.Count} log(s)…",
             ToolTipIcon.Info);
 
-        int ok = 0, fail = 0;
+        int ok = 0, skipped = 0, fail = 0;
         try
         {
             var uploader = ManualUploader.FromRegistry();
             foreach (var path in candidates)
             {
-                var success = await uploader.UploadOneAsync(path);
-                if (success)
+                var result = await uploader.UploadOneAsync(path);
+                switch (result)
                 {
-                    ok++;
-                    IncrementUploadCount();
-                }
-                else
-                {
-                    fail++;
+                    case ManualUploader.UploadResult.Uploaded:
+                        ok++;
+                        IncrementUploadCount();
+                        break;
+                    case ManualUploader.UploadResult.LowValueDeleted:
+                        // Server rejected as noise; we deleted locally. Not a
+                        // failure (don't retry) and not a real upload (don't
+                        // count). Surface to the user so they know why the
+                        // candidate list shrunk.
+                        skipped++;
+                        break;
+                    default:
+                        fail++;
+                        break;
                 }
             }
         }
@@ -189,9 +197,10 @@ internal sealed class TrayApp : ApplicationContext
 
         RefreshCountHeader();
         var icon = fail == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning;
-        var msg = fail == 0
-            ? $"Uploaded {ok} log(s). Captures total: {ReadUploadCount()}."
-            : $"Uploaded {ok} / failed {fail}. Captures total: {ReadUploadCount()}.";
+        var parts = new List<string> { $"Uploaded {ok} log(s)" };
+        if (skipped > 0) parts.Add($"skipped {skipped} empty");
+        if (fail > 0) parts.Add($"failed {fail}");
+        var msg = string.Join(", ", parts) + $". Captures total: {ReadUploadCount()}.";
         _icon.ShowBalloonTip(4000, "OpenSAAB Collector", msg, icon);
     }
 
