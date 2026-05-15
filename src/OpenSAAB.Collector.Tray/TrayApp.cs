@@ -243,20 +243,82 @@ internal sealed class TrayApp : ApplicationContext
 
         try
         {
-            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
-                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
-            key.SetValue("UsbCaptureRequested", start ? 1 : 0, RegistryValueKind.DWord);
+            using (var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath))
+            {
+                // Clear any prior failure marker before requesting; the service
+                // sets it again if the new attempt fails.
+                key.SetValue("UsbCaptureLastFailure", "", RegistryValueKind.String);
+                key.SetValue("UsbCaptureRequested", start ? 1 : 0, RegistryValueKind.DWord);
+            }
             RefreshUsbCaptureItems();
-            var label = start ? "started" : "stopped";
-            _icon.ShowBalloonTip(3000, "OpenSAAB Collector",
-                $"USB capture {label}. Output goes to %TEMP%\\usbpcap_*.pcapng and uploads after a 30 s settle.",
-                ToolTipIcon.Info);
+
+            if (start)
+            {
+                // Validate: the service polls every 2 s and on healthy spawn
+                // writes UsbCaptureLastFile within ~3 s. Poll Registry for up
+                // to 7 s and surface a precise outcome to the user.
+                _ = Task.Run(() => PollUsbCaptureOutcome(starting: true));
+            }
+            else
+            {
+                _icon.ShowBalloonTip(3000, "OpenSAAB Collector",
+                    "USB capture stopped. The .pcapng will upload after a 30 s settle.",
+                    ToolTipIcon.Info);
+            }
         }
         catch (Exception ex)
         {
             MessageBox.Show("Failed to update USB capture state (admin required for HKLM write?):\n\n" + ex.Message,
                 "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
+    }
+
+    /// <summary>
+    /// After flipping UsbCaptureRequested=1, watch Registry for the supervisor
+    /// to confirm spawn-and-file-creation, OR to write a failure marker. Updates
+    /// the tray balloon with a precise success or failure message.
+    /// </summary>
+    private void PollUsbCaptureOutcome(bool starting)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(7);
+        string? lastFile = null;
+        string lastFailure = "";
+
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
+                lastFile    = key?.GetValue("UsbCaptureLastFile")    as string;
+                lastFailure = key?.GetValue("UsbCaptureLastFailure") as string ?? "";
+            }
+            catch { }
+
+            if (!string.IsNullOrEmpty(lastFailure))
+            {
+                _icon.ShowBalloonTip(7000, "OpenSAAB Collector — USB capture failed",
+                    $"Couldn't start USBPcap. Reason: {lastFailure}\n\n" +
+                    "Check Event Viewer → Application → OpenSAABCollector for details.",
+                    ToolTipIcon.Error);
+                return;
+            }
+            // If the supervisor wrote a file path AND the file actually exists
+            // AND UsbCaptureRequested is still 1 (didn't get bounced), the
+            // capture is healthy.
+            if (!string.IsNullOrEmpty(lastFile) && File.Exists(lastFile))
+            {
+                _icon.ShowBalloonTip(4000, "OpenSAAB Collector",
+                    $"USB capture running.\nFile: {Path.GetFileName(lastFile!)}",
+                    ToolTipIcon.Info);
+                return;
+            }
+            Thread.Sleep(500);
+        }
+
+        _icon.ShowBalloonTip(7000, "OpenSAAB Collector — USB capture status unknown",
+            "The service didn't confirm capture start within 7 s. Check Event Viewer → Application → OpenSAABCollector.",
+            ToolTipIcon.Warning);
     }
 
     private static bool UsbPcapIsInstalled()

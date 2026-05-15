@@ -28,6 +28,9 @@ public sealed class UsbPcapSupervisor : BackgroundService
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string RequestedValue = "UsbCaptureRequested";
     private const string LastFileValue = "UsbCaptureLastFile";
+    // Failure marker the tray polls to surface "couldn't start" to the user.
+    // Empty string ("") = OK / no failure.
+    private const string LastFailureValue = "UsbCaptureLastFailure";
 
     // Chipsoft Pro USB IDs — same values the cstech2win shim filters on.
     private const ushort ChipsoftVid = 0x0483;
@@ -79,6 +82,7 @@ public sealed class UsbPcapSupervisor : BackgroundService
         {
             _log.LogWarning("USBPcapCMD.exe not found on PATH or in known install dirs — capture cannot start. " +
                             "Install USBPcap from https://desowin.org/usbpcap/ and reboot once.");
+            WriteFailure("USBPcap not installed");
             WriteRequested(false);
             return;
         }
@@ -86,8 +90,9 @@ public sealed class UsbPcapSupervisor : BackgroundService
         var iface = PickInterface(usbpcapCmd);
         if (iface == null)
         {
-            _log.LogWarning("Could not auto-pick a USBPcap interface (no Chipsoft enumerated? USBPcap driver not loaded?). " +
-                            "Capture not starting.");
+            _log.LogWarning("Could not auto-pick a USBPcap interface (no Root Hub enumerated? " +
+                            "USBPcap driver not loaded — reboot needed after install?). Capture not starting.");
+            WriteFailure("No USBPcap interface");
             WriteRequested(false);
             return;
         }
@@ -95,14 +100,20 @@ public sealed class UsbPcapSupervisor : BackgroundService
         var wallMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
         _currentPath = Path.Combine(Path.GetTempPath(), $"usbpcap_{wallMs}.pcapng");
 
-        // Filter expression: only frames whose USB device descriptor matches
-        // the Chipsoft VID:PID. USBPcap's --devices arg takes addresses (1.x)
-        // not VID/PID; we constrain via post-filter --capture-from-all-devices
-        // off + interface selection. Most robust route is to capture the chosen
-        // hub interface and let the user's bus be Chipsoft-only (typical), then
-        // post-filter server-side via decode_chipsoft_pcap.py. v0.2.0 ships
-        // the simple form; v0.3.0 can tighten to per-device filtering.
-        var args = $"-d \"{iface}\" -o \"{_currentPath}\"";
+        // Args breakdown:
+        //   -d <iface>  the USBPcap virtual interface (\\.\USBPcap1 typically)
+        //   -A          --capture-from-all-devices: capture every device on
+        //               the chosen Root Hub. *REQUIRED* — without this (or
+        //               --devices), USBPcapCMD enters interactive mode and
+        //               blocks on stdin asking which device to capture, then
+        //               sits there forever from a service context. Found by
+        //               smoke test 2026-05-15: spawn succeeded, file never
+        //               appeared because the process was waiting on input.
+        //   -o <file>   pcapng output path.
+        // v0.3.0 may switch to `--devices <addr>` once the supervisor probes
+        // the Chipsoft Pro's USB address; for v0.2.x we trust the hub-level
+        // capture and post-filter server-side.
+        var args = $"-d \"{iface}\" -A -o \"{_currentPath}\"";
         try
         {
             var psi = new ProcessStartInfo(usbpcapCmd, args)
@@ -116,20 +127,81 @@ public sealed class UsbPcapSupervisor : BackgroundService
             if (_proc == null)
             {
                 _log.LogWarning("USBPcapCMD failed to launch.");
+                WriteFailure("USBPcapCMD launch returned null");
                 WriteRequested(false);
                 return;
             }
-            WriteLastFile(_currentPath);
-            _log.LogInformation("USBPcapCMD started: {Path} (interface={Iface}, pid={Pid})",
-                _currentPath, iface, _proc.Id);
+
+            // Validate: USBPcap should create the .pcapng within ~1 s of spawn.
+            // Wait up to 3 s. If the file doesn't appear, the spawn went bad —
+            // most likely a bad arg, missing driver, or USBPcapCMD crashed.
+            // Kill, surface the failure, bounce the request flag.
+            var deadline = DateTime.UtcNow.AddSeconds(3);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (_proc.HasExited)
+                {
+                    var exit = _proc.ExitCode;
+                    var stderr = SafeReadStderrSnippet(_proc);
+                    _log.LogWarning("USBPcapCMD exited prematurely with code {ExitCode}. Capture aborted. " +
+                                    "Args=\"{Args}\" stderr=\"{Stderr}\"",
+                                    exit, args, stderr);
+                    WriteFailure($"USBPcapCMD exit {exit}: {stderr}");
+                    _proc.Dispose(); _proc = null; _currentPath = null;
+                    WriteRequested(false);
+                    return;
+                }
+                if (File.Exists(_currentPath))
+                {
+                    // Healthy: file is there and the process is alive.
+                    WriteLastFile(_currentPath);
+                    WriteFailure("");  // clear any prior failure marker
+                    _log.LogWarning(  // Warning level so EventLog actually shows it
+                        "USBPcap capture started OK. file={Path} iface={Iface} pid={Pid}",
+                        _currentPath, iface, _proc.Id);
+                    return;
+                }
+                Thread.Sleep(150);
+            }
+
+            // 3 s elapsed, no file. Process is alive but stuck (most likely
+            // waiting on stdin in interactive mode — pre-v0.2.1 bug where we
+            // missed -A. If we ever see this in the wild again, look for new
+            // USBPcapCMD argument surface that defaults back to interactive.)
+            _log.LogWarning("USBPcapCMD spawned but no output file at {Path} after 3 s. Process likely stuck — killing. " +
+                            "Args=\"{Args}\"", _currentPath, args);
+            WriteFailure("Output file never created (process stalled)");
+            try { _proc.Kill(); _proc.WaitForExit(2000); } catch { }
+            _proc?.Dispose(); _proc = null; _currentPath = null;
+            WriteRequested(false);
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "Failed to start USBPcapCMD.");
+            WriteFailure($"Exception: {ex.Message}");
             WriteRequested(false);
             _proc = null;
             _currentPath = null;
         }
+    }
+
+    private static string SafeReadStderrSnippet(Process p)
+    {
+        try
+        {
+            if (p.StandardError != null)
+            {
+                var task = p.StandardError.ReadToEndAsync();
+                if (task.Wait(500))
+                {
+                    var s = (task.Result ?? "").Trim();
+                    if (s.Length > 160) s = s.Substring(0, 160) + "…";
+                    return s;
+                }
+            }
+        }
+        catch { }
+        return "(no stderr captured)";
     }
 
     private void StopCapture()
@@ -161,7 +233,20 @@ public sealed class UsbPcapSupervisor : BackgroundService
             try { p.Dispose(); } catch { }
         }
 
-        _log.LogInformation("USBPcapCMD stopped. Output: {Path}", path);
+        // Log at Warning so EventLog actually shows it (the default EventLog
+        // provider filter on .NET 8 hides Information).
+        var ok = path != null && File.Exists(path);
+        var sz = ok ? new FileInfo(path!).Length : 0L;
+        if (ok && sz > 0)
+        {
+            _log.LogWarning("USBPcap capture stopped OK. file={Path} bytes={Bytes}", path, sz);
+            WriteFailure("");  // clear any stale failure marker on clean stop
+        }
+        else
+        {
+            _log.LogWarning("USBPcap capture stopped but output is missing or empty. file={Path} bytes={Bytes}", path, sz);
+            WriteFailure($"Stopped but no output ({sz} bytes at {path})");
+        }
     }
 
     private static bool ReadRequested()
@@ -192,6 +277,22 @@ public sealed class UsbPcapSupervisor : BackgroundService
             using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
                            ?? Registry.LocalMachine.CreateSubKey(KeyPath);
             key.SetValue(LastFileValue, path, RegistryValueKind.String);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Marker the tray can poll after clicking Start to see whether the
+    /// supervisor reached "spawned + file created" or hit a failure path.
+    /// Empty string clears it; non-empty is a human-readable cause.
+    /// </summary>
+    private static void WriteFailure(string reason)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
+            key.SetValue(LastFailureValue, reason ?? "", RegistryValueKind.String);
         }
         catch { }
     }

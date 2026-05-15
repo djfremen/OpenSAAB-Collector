@@ -18,6 +18,11 @@ builder.Services.AddHostedService<UsbPcapSupervisor>();
 builder.Logging.AddEventLog(settings =>
 {
     settings.SourceName = "OpenSAABCollector";
+    // Default EventLog filter is LogLevel.Warning. Drop to Information so
+    // "OpenSAAB Collector starting. Watch=…" + "Uploaded …" entries land in
+    // Application Event Log too — useful when contributors hit weird state
+    // and we need a paper trail without redeploying for diagnostics.
+    settings.Filter = (_, level) => level >= LogLevel.Information;
 });
 
 var host = builder.Build();
