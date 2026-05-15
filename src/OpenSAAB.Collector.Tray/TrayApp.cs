@@ -31,13 +31,15 @@ internal sealed class TrayApp : ApplicationContext
     private readonly ToolStripMenuItem _versionHeader;
     private readonly ToolStripMenuItem _countHeader;
     private readonly ToolStripMenuItem _toggleUpload;
+    private readonly ToolStripMenuItem _startUsbCapture;
+    private readonly ToolStripMenuItem _stopUsbCapture;
     private readonly ContextMenuStrip _menu;
     private LogConsoleForm? _consoleForm;
 
     public TrayApp()
     {
         _menu = new ContextMenuStrip();
-        _menu.Opening += (_, _) => RefreshCountHeader();
+        _menu.Opening += (_, _) => { RefreshCountHeader(); RefreshUsbCaptureItems(); };
 
         _versionHeader = new ToolStripMenuItem($"OpenSAAB Collector  v{AppVersion}")
         {
@@ -59,6 +61,16 @@ internal sealed class TrayApp : ApplicationContext
         };
         _menu.Items.Add(_toggleUpload);
         _menu.Items.Add(new ToolStripSeparator());
+
+        // USB capture controls (v0.2.0) — write to Registry; the service's
+        // UsbPcapSupervisor polls and spawns/kills USBPcapCMD.exe.
+        _startUsbCapture = new ToolStripMenuItem("🟢 Start USB capture", null, (_, _) => SetUsbCapture(true));
+        _stopUsbCapture = new ToolStripMenuItem("🔴 Stop USB capture",  null, (_, _) => SetUsbCapture(false));
+        RefreshUsbCaptureItems();
+        _menu.Items.Add(_startUsbCapture);
+        _menu.Items.Add(_stopUsbCapture);
+        _menu.Items.Add(new ToolStripSeparator());
+
         _menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
         _menu.Items.Add("Upload pending logs now", null, (_, _) => _ = UploadNowAsync());
         _menu.Items.Add("Open log folder", null, (_, _) =>
@@ -202,6 +214,88 @@ internal sealed class TrayApp : ApplicationContext
         if (fail > 0) parts.Add($"failed {fail}");
         var msg = string.Join(", ", parts) + $". Captures total: {ReadUploadCount()}.";
         _icon.ShowBalloonTip(4000, "OpenSAAB Collector", msg, icon);
+    }
+
+    /// <summary>
+    /// USB-capture state lives in HKLM\SOFTWARE\OpenSAAB\Collector\UsbCaptureRequested.
+    /// Tray writes it (UAC-prompted on first write because HKLM); service polls
+    /// it from UsbPcapSupervisor and spawns / kills USBPcapCMD.exe accordingly.
+    /// </summary>
+    private void SetUsbCapture(bool start)
+    {
+        // On Start: surface "USBPcap not installed" to the user immediately
+        // rather than silently failing service-side and bouncing the flag.
+        if (start && !UsbPcapIsInstalled())
+        {
+            var r = MessageBox.Show(
+                "USBPcap doesn't appear to be installed on this machine.\n\n" +
+                "USB capture needs the USBPcap kernel driver. Install it from\n" +
+                "https://desowin.org/usbpcap/  (free, ~3 MB, one-time reboot required).\n\n" +
+                "Open the download page now?",
+                "OpenSAAB Collector — USBPcap missing",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (r == DialogResult.Yes)
+            {
+                Process.Start(new ProcessStartInfo("https://desowin.org/usbpcap/") { UseShellExecute = true });
+            }
+            return;
+        }
+
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
+            key.SetValue("UsbCaptureRequested", start ? 1 : 0, RegistryValueKind.DWord);
+            RefreshUsbCaptureItems();
+            var label = start ? "started" : "stopped";
+            _icon.ShowBalloonTip(3000, "OpenSAAB Collector",
+                $"USB capture {label}. Output goes to %TEMP%\\usbpcap_*.pcapng and uploads after a 30 s settle.",
+                ToolTipIcon.Info);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Failed to update USB capture state (admin required for HKLM write?):\n\n" + ex.Message,
+                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private static bool UsbPcapIsInstalled()
+    {
+        // Same probe order the service uses (PATH + standard install dirs).
+        var pathSearch = Environment.GetEnvironmentVariable("PATH")?.Split(Path.PathSeparator) ?? [];
+        foreach (var dir in pathSearch)
+        {
+            if (File.Exists(Path.Combine(dir, "USBPcapCMD.exe"))) return true;
+        }
+        var pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        var candidates = new[]
+        {
+            Path.Combine(pf, "USBPcap", "USBPcapCMD.exe"),
+            @"C:\Program Files\USBPcap\USBPcapCMD.exe",
+            @"C:\Program Files (x86)\USBPcap\USBPcapCMD.exe",
+        };
+        foreach (var c in candidates)
+        {
+            if (File.Exists(c)) return true;
+        }
+        return false;
+    }
+
+    private static bool ReadUsbCaptureRequested()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
+            return (key?.GetValue("UsbCaptureRequested") as int? ?? 0) != 0;
+        }
+        catch { return false; }
+    }
+
+    private void RefreshUsbCaptureItems()
+    {
+        var running = ReadUsbCaptureRequested();
+        _startUsbCapture.Enabled = !running;
+        _stopUsbCapture.Enabled = running;
     }
 
     private static bool ReadUploadEnabled()

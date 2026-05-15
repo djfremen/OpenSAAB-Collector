@@ -18,7 +18,10 @@ namespace OpenSAAB.Collector.Service;
 public sealed class Worker : BackgroundService
 {
     private const int SettleSeconds = 30;
+    // Shim log prefixes (.log) — cstech2win + j2534
     private static readonly string[] LogPrefixes = ["cstech2win_shim_", "j2534_shim_"];
+    // USBPcap output prefix (.pcapng) — written by UsbPcapSupervisor
+    private const string UsbpcapPrefix = "usbpcap_";
 
     private readonly ILogger<Worker> _log;
     private readonly InstallSettings _settings;
@@ -147,8 +150,16 @@ public sealed class Worker : BackgroundService
                 gzipped = ms.ToArray();
             }
 
-            var source = Path.GetFileName(path).StartsWith("cstech2win_shim_", StringComparison.Ordinal)
-                ? "cstech2win" : "j2534";
+            var fname = Path.GetFileName(path);
+            string source;
+            if (fname.StartsWith("cstech2win_shim_", StringComparison.Ordinal))
+                source = "cstech2win";
+            else if (fname.StartsWith("j2534_shim_", StringComparison.Ordinal))
+                source = "j2534";
+            else if (fname.StartsWith(UsbpcapPrefix, StringComparison.Ordinal))
+                source = "usbpcap";
+            else
+                source = "cstech2win";  // unreachable given IsTargetLog gate
 
             var ok = await _uploader.UploadAsync(gzipped, source, stop);
             if (ok)
@@ -199,10 +210,20 @@ public sealed class Worker : BackgroundService
     private static bool IsTargetLog(string name)
     {
         if (string.IsNullOrEmpty(name)) return false;
-        if (!name.EndsWith(".log", StringComparison.OrdinalIgnoreCase)) return false;
-        foreach (var p in LogPrefixes)
+        // Shim text logs end in .log
+        if (name.EndsWith(".log", StringComparison.OrdinalIgnoreCase))
         {
-            if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
+            foreach (var p in LogPrefixes)
+            {
+                if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+            return false;
+        }
+        // USBPcap captures end in .pcapng
+        if (name.EndsWith(".pcapng", StringComparison.OrdinalIgnoreCase)
+            && name.StartsWith(UsbpcapPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
         }
         return false;
     }

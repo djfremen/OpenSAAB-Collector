@@ -13,6 +13,7 @@ builder.Services.AddWindowsService(options =>
 builder.Services.AddSingleton<InstallSettings>(_ => InstallSettings.Load());
 builder.Services.AddSingleton<Uploader>();
 builder.Services.AddHostedService<Worker>();
+builder.Services.AddHostedService<UsbPcapSupervisor>();
 
 builder.Logging.AddEventLog(settings =>
 {
