@@ -269,8 +269,36 @@ internal sealed class TrayApp : ApplicationContext
             }
             else
             {
+                // Pop the captures directory in Explorer so the user can open
+                // the .pcapng in Wireshark for manual validation before upload.
+                // If the file path is known, highlight it; otherwise fall back
+                // to opening %TEMP%.
+                string? lastFile = null;
+                try
+                {
+                    using var roKey = Registry.LocalMachine.OpenSubKey(KeyPath);
+                    lastFile = roKey?.GetValue("UsbCaptureLastFile") as string;
+                }
+                catch { }
+
+                try
+                {
+                    if (!string.IsNullOrEmpty(lastFile) && File.Exists(lastFile))
+                    {
+                        Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{lastFile}\"")
+                            { UseShellExecute = true });
+                    }
+                    else
+                    {
+                        Process.Start(new ProcessStartInfo("explorer.exe", Path.GetTempPath())
+                            { UseShellExecute = true });
+                    }
+                }
+                catch { }
+
                 _icon.ShowBalloonTip(3000, "OpenSAAB Collector",
-                    "USB capture stopped. The .pcapng will upload after a 30 s settle.",
+                    "USB capture stopped. Explorer opened to the .pcapng for validation. " +
+                    "The file will upload after a 30 s settle.",
                     ToolTipIcon.Info);
             }
         }
