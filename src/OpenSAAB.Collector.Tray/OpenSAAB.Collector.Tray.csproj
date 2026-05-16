@@ -11,7 +11,7 @@
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <Version>0.2.4</Version>
+    <Version>0.2.5</Version>
     <NoWin32Manifest>false</NoWin32Manifest>
     <!-- ApplicationIcon intentionally omitted; tray code falls back to
          SystemIcons.Information at runtime. Drop an app.ico into this

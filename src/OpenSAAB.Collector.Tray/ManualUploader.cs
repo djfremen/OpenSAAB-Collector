@@ -17,7 +17,7 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.2.4";
+    private const string CollectorVersion = "0.2.5";
 
     /// <summary>Per-file outcome of <see cref="UploadOneAsync"/>.</summary>
     internal enum UploadResult
@@ -139,6 +139,25 @@ internal sealed class ManualUploader
         }
         if (bytes.Length == 0) return UploadResult.Failed;
 
+        // v0.2.5+: pre-upload pcap integrity check. Stops malformed captures
+        // from entering the retry loop. Service-side Worker does the same;
+        // doubling up because ManualUploader can be invoked when the service
+        // hasn't yet run on the file.
+        if (path.EndsWith(".pcapng", StringComparison.OrdinalIgnoreCase))
+        {
+            if (bytes.Length < 24) { try { File.Delete(path); } catch { } return UploadResult.LowValueDeleted; }
+            uint magic = (uint)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
+            uint network = (uint)(bytes[20] | (bytes[21] << 8) | (bytes[22] << 16) | (bytes[23] << 24));
+            if (magic != 0xA1B2C3D4u && magic != 0xA1B23C4Du) {
+                try { File.Delete(path); } catch { }
+                return UploadResult.LowValueDeleted;
+            }
+            if (network != 249 || bytes.Length == 24) {
+                try { File.Delete(path); } catch { }
+                return UploadResult.LowValueDeleted;
+            }
+        }
+
         byte[] gzipped;
         using (var ms = new MemoryStream())
         {
@@ -170,6 +189,7 @@ internal sealed class ManualUploader
         req.Headers.Add("X-Capture-Source", source);
         req.Headers.Add("X-Consent-Version", _consentVersion);
         req.Headers.Add("X-Collector-Version", CollectorVersion);
+        req.Headers.Add("X-Content-SHA256", Sha256Hex(gzipped));
         if (!string.IsNullOrEmpty(_vehicleYear)) req.Headers.Add("X-Vehicle-Year", _vehicleYear);
         if (!string.IsNullOrEmpty(_vehicleModel)) req.Headers.Add("X-Vehicle-Model", _vehicleModel);
 
@@ -222,5 +242,11 @@ internal sealed class ManualUploader
         }
 
         return acceptedAsLowValue ? UploadResult.LowValueDeleted : UploadResult.Uploaded;
+    }
+
+    private static string Sha256Hex(byte[] data)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        return Convert.ToHexString(sha.ComputeHash(data)).ToLowerInvariant();
     }
 }

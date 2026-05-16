@@ -139,6 +139,22 @@ public sealed class Worker : BackgroundService
                 return;
             }
 
+            // v0.2.5+: pre-upload integrity check for .pcapng captures.
+            // The Server's /ingest does a similar check but the client-side
+            // version stops bad files from entering the retry loop at all.
+            // The v0.2.0-v0.2.4 bug where killed USBPcapCMD left 24-byte
+            // SHB-only stubs in SystemTemp would retry forever; this catches
+            // the same shape (and any other obvious corruption) and deletes
+            // locally instead.
+            if (path.EndsWith(".pcapng", StringComparison.OrdinalIgnoreCase)
+                && !IsValidPcapHead(bytes))
+            {
+                _log.LogWarning("Skipping malformed pcap {Path} ({Bytes} bytes) — deleting locally.",
+                    path, bytes.Length);
+                try { File.Delete(path); } catch { }
+                return;
+            }
+
             byte[] gzipped;
             using (var ms = new MemoryStream())
             {
@@ -205,6 +221,28 @@ public sealed class Worker : BackgroundService
         {
             _log.LogError(ex, "ProcessOne unexpected error for {Path}", path);
         }
+    }
+
+    /// <summary>
+    /// Validate a pcap file head: 24-byte global header, classic libpcap LE
+    /// magic, LINKTYPE_USBPCAP = 249. Returns false for anything that wouldn't
+    /// pass the server's `_cheap_format_ok` check, so we avoid posting bytes
+    /// that we know would be rejected 422 anyway.
+    ///
+    /// Cheap: only inspects the first 24 bytes regardless of file size.
+    /// </summary>
+    private static bool IsValidPcapHead(byte[] bytes)
+    {
+        if (bytes.Length < 24) return false;
+        uint magic = (uint)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
+        if (magic != 0xA1B2C3D4u && magic != 0xA1B23C4Du) return false;
+        // network type at offset 20 (LE u32) must be 249 = LINKTYPE_USBPCAP
+        uint network = (uint)(bytes[20] | (bytes[21] << 8) | (bytes[22] << 16) | (bytes[23] << 24));
+        if (network != 249) return false;
+        // Also require at least one record beyond the global header — a file
+        // that's exactly 24 bytes is the SHB-only stub the v0.2.0 supervisor
+        // bug produced; nothing analytically interesting can live in it.
+        return bytes.Length > 24;
     }
 
     private static bool IsTargetLog(string name)

@@ -82,10 +82,20 @@ public sealed class Uploader
         req.Headers.Add("X-Capture-Source", source);
         req.Headers.Add("X-Consent-Version", _settings.ConsentVersion);
         req.Headers.Add("X-Collector-Version", _settings.CollectorVersion);
+        // v0.2.5+: client-side SHA256 of the gzipped body. Server verifies
+        // and uses for dedup (byte-identical re-uploads short-circuit to 200
+        // with {"duplicate": true} instead of storing a second R2 object).
+        req.Headers.Add("X-Content-SHA256", Sha256Hex(body));
         if (!string.IsNullOrEmpty(_settings.VehicleYear))
             req.Headers.Add("X-Vehicle-Year", _settings.VehicleYear);
         if (!string.IsNullOrEmpty(_settings.VehicleModel))
             req.Headers.Add("X-Vehicle-Model", _settings.VehicleModel);
         return req;
+    }
+
+    internal static string Sha256Hex(byte[] data)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        return Convert.ToHexString(sha.ComputeHash(data)).ToLowerInvariant();
     }
 }
