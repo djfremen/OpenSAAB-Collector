@@ -17,7 +17,7 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.2.1";
+    private const string CollectorVersion = "0.2.2";
 
     /// <summary>Per-file outcome of <see cref="UploadOneAsync"/>.</summary>
     internal enum UploadResult
@@ -75,30 +75,49 @@ internal sealed class ManualUploader
             key.GetValue("VehicleModel") as string);
     }
 
-    public static List<string> FindPendingLogs(string tempDir)
+    /// <summary>
+    /// Enumerate pending captures across all TEMP locations the Collector can
+    /// write to. Shim logs land in the user's %TEMP% (CSTech2Win.dll runs in
+    /// Tech2Win's user process); USBPcap captures land in
+    /// <c>C:\Windows\SystemTemp</c> because UsbPcapSupervisor runs as LocalSystem
+    /// and its <c>Path.GetTempPath()</c> resolves there. We scan both.
+    /// </summary>
+    public static List<string> FindPendingLogs(string userTempDir)
     {
         var results = new List<string>();
-        try
+        var dirs = new List<string> { userTempDir };
+        // LocalSystem's TEMP (where the supervisor drops pcaps).
+        var systemTemp = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "SystemTemp");
+        if (Directory.Exists(systemTemp)) dirs.Add(systemTemp);
+
+        foreach (var dir in dirs)
         {
-            foreach (var path in Directory.EnumerateFiles(tempDir, "*.log"))
+            try
             {
-                var name = Path.GetFileName(path);
-                foreach (var p in LogPrefixes)
+                // Shim text logs (cstech2win, j2534) — userTempDir mostly,
+                // but cheap to look in both.
+                foreach (var path in Directory.EnumerateFiles(dir, "*.log"))
                 {
-                    if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase))
+                    var name = Path.GetFileName(path);
+                    foreach (var p in LogPrefixes)
                     {
-                        // Skip empty + zero-size files (no real content yet).
-                        try
+                        if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase))
                         {
-                            if (new FileInfo(path).Length > 0) results.Add(path);
+                            try { if (new FileInfo(path).Length > 0) results.Add(path); }
+                            catch { }
+                            break;
                         }
-                        catch { /* skip racing files */ }
-                        break;
                     }
                 }
+                // USBPcap captures (.pcapng) — usually SystemTemp.
+                foreach (var path in Directory.EnumerateFiles(dir, "usbpcap_*.pcapng"))
+                {
+                    try { if (new FileInfo(path).Length > 24) results.Add(path); }  // skip SHB-only stubs
+                    catch { }
+                }
             }
+            catch { /* unreadable dir — keep scanning the others */ }
         }
-        catch { /* swallow — return what we have */ }
         return results;
     }
 
@@ -130,8 +149,16 @@ internal sealed class ManualUploader
             gzipped = ms.ToArray();
         }
 
-        var source = Path.GetFileName(path).StartsWith("cstech2win_shim_", StringComparison.Ordinal)
-            ? "cstech2win" : "j2534";
+        var fname = Path.GetFileName(path);
+        string source;
+        if (fname.StartsWith("cstech2win_shim_", StringComparison.Ordinal))
+            source = "cstech2win";
+        else if (fname.StartsWith("j2534_shim_", StringComparison.Ordinal))
+            source = "j2534";
+        else if (fname.StartsWith("usbpcap_", StringComparison.Ordinal))
+            source = "usbpcap";
+        else
+            source = "cstech2win";  // unreachable given FindPendingLogs filter
 
         using var req = new HttpRequestMessage(HttpMethod.Post, _ingestUrl)
         {

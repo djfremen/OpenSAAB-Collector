@@ -101,19 +101,34 @@ public sealed class UsbPcapSupervisor : BackgroundService
         _currentPath = Path.Combine(Path.GetTempPath(), $"usbpcap_{wallMs}.pcapng");
 
         // Args breakdown:
-        //   -d <iface>  the USBPcap virtual interface (\\.\USBPcap1 typically)
-        //   -A          --capture-from-all-devices: capture every device on
-        //               the chosen Root Hub. *REQUIRED* — without this (or
-        //               --devices), USBPcapCMD enters interactive mode and
-        //               blocks on stdin asking which device to capture, then
-        //               sits there forever from a service context. Found by
-        //               smoke test 2026-05-15: spawn succeeded, file never
-        //               appeared because the process was waiting on input.
-        //   -o <file>   pcapng output path.
-        // v0.3.0 may switch to `--devices <addr>` once the supervisor probes
-        // the Chipsoft Pro's USB address; for v0.2.x we trust the hub-level
-        // capture and post-filter server-side.
-        var args = $"-d \"{iface}\" -A -o \"{_currentPath}\"";
+        //   -d <iface>      the USBPcap virtual interface (\\.\USBPcap1)
+        //   -s 96           --snaplen 96: cap each captured packet at 96 bytes.
+        //                   USBPcap pseudo-header (27 B) + chipsoft envelope
+        //                   (≤39 B) + ISO-TP / UDS payload (≤8 B per frame on
+        //                   single-frame transfers; ISO-TP CFs split larger
+        //                   payloads across multiple URBs anyway) → well under
+        //                   96 B for every routine chipsoft URB. Truncation is
+        //                   lossless for our use case and cuts file size on the
+        //                   long tail of buffered transfers.
+        //   --devices <n>   capture only the Chipsoft (USB Serial Device).
+        //                   Picked via --extcap-config below. Falls back to
+        //                   -A if the Chipsoft can't be identified (multi-
+        //                   serial-device hosts, weird enumeration). The win
+        //                   here is large: a 9.44 MB hub-wide capture from
+        //                   today's bench had only ~1.4% Chipsoft traffic;
+        //                   the other 98.6% was keyboard / fingerprint / etc.
+        //   -o <file>       output path.
+        // *Important*: missing both `-A` and `--devices` puts USBPcapCMD in
+        // interactive mode (blocks on stdin asking which device). That's how
+        // v0.2.0 silently produced no file. Always pass one of them.
+        var chipsoftAddr = PickChipsoftAddress(usbpcapCmd, iface);
+        var deviceFlag = chipsoftAddr != null ? $"--devices {chipsoftAddr}" : "-A";
+        var args = $"-d \"{iface}\" -s 96 {deviceFlag} -o \"{_currentPath}\"";
+        if (chipsoftAddr == null)
+            _log.LogWarning("Chipsoft Pro not auto-detected in USBPcap device list. " +
+                            "Falling back to hub-wide capture (-A). File will be larger.");
+        else
+            _log.LogWarning("Filtering capture to Chipsoft Pro USB device {Addr}.", chipsoftAddr);
         try
         {
             var psi = new ProcessStartInfo(usbpcapCmd, args)
@@ -317,6 +332,59 @@ public sealed class UsbPcapSupervisor : BackgroundService
         foreach (var c in candidates)
         {
             if (File.Exists(c)) return c;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Ask USBPcapCMD for the per-interface device list and pick the entry
+    /// whose display name says "USB Serial Device" — the Chipsoft Pro
+    /// enumerates as a USB CDC ACM device on Win10 with that exact friendly
+    /// name. Returns the USBPcap numeric address (the value Wireshark passes
+    /// to <c>--devices N</c>) or null if no match.
+    ///
+    /// `--extcap-config` output lines we parse:
+    ///   value {arg=99}{value=21}{display=[21] USB Serial Device}{enabled=true}
+    /// Cross-validated on this bench: PnP enumerates the Chipsoft at
+    /// VID_0483&amp;PID_5740 with FriendlyName "USB Serial Device (COM5)";
+    /// USBPcap shows it at address 21 in its `--devices` list.
+    /// </summary>
+    private string? PickChipsoftAddress(string usbpcapCmd, string iface)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(usbpcapCmd, $"--extcap-interface \"{iface}\" --extcap-config")
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
+            using var p = Process.Start(psi);
+            if (p == null) return null;
+            var stdout = p.StandardOutput.ReadToEnd();
+            p.WaitForExit(5000);
+
+            foreach (var line in stdout.Split('\n'))
+            {
+                // We want USB Serial Device top-level entries, not its children
+                // (which would have a `{parent=N}` suffix).
+                if (!line.Contains("USB Serial Device")) continue;
+                if (line.Contains("{parent=")) continue;
+                var idx = line.IndexOf("{value=", StringComparison.Ordinal);
+                if (idx < 0) continue;
+                var start = idx + "{value=".Length;
+                var end = line.IndexOf('}', start);
+                if (end < 0) continue;
+                var val = line.Substring(start, end - start).Trim();
+                // Only return purely numeric top-level addresses (e.g. "21"),
+                // not subkeys like "4_1".
+                if (int.TryParse(val, out _)) return val;
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(ex, "PickChipsoftAddress failed");
         }
         return null;
     }
