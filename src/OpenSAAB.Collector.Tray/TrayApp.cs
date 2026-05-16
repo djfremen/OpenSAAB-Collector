@@ -269,10 +269,16 @@ internal sealed class TrayApp : ApplicationContext
             }
             else
             {
+                // v0.2.7: record when we asked for the stop, then poll the
+                // supervisor for confirmation. Pre-v0.2.7 we showed an
+                // optimistic balloon and trusted the service had killed the
+                // process — but if the supervisor had lost its in-memory
+                // Process reference (service restart since spawn), Stop was
+                // a silent no-op and USBPcapCMD kept running for hours.
+                var requestedAtUtc = DateTime.UtcNow;
+
                 // Pop the captures directory in Explorer so the user can open
                 // the .pcapng in Wireshark for manual validation before upload.
-                // If the file path is known, highlight it; otherwise fall back
-                // to opening %TEMP%.
                 string? lastFile = null;
                 try
                 {
@@ -296,10 +302,7 @@ internal sealed class TrayApp : ApplicationContext
                 }
                 catch { }
 
-                _icon.ShowBalloonTip(3000, "OpenSAAB Collector",
-                    "USB capture stopped. Explorer opened to the .pcapng for validation. " +
-                    "The file will upload after a 30 s settle.",
-                    ToolTipIcon.Info);
+                _ = Task.Run(() => PollUsbCaptureStopOutcome(requestedAtUtc));
             }
         }
         catch (Exception ex)
@@ -358,6 +361,64 @@ internal sealed class TrayApp : ApplicationContext
 
         _icon.ShowBalloonTip(7000, "OpenSAAB Collector — USB capture status unknown",
             "The service didn't confirm capture start within 7 s. Check Event Viewer → Application → OpenSAABCollector.",
+            ToolTipIcon.Warning);
+    }
+
+    /// <summary>
+    /// v0.2.7: after flipping UsbCaptureRequested=0, poll for the supervisor
+    /// to either write a fresh UsbCaptureLastStop timestamp (post-request)
+    /// or zero out UsbCapturePid. Either signal confirms a real stop.
+    /// Without this, pre-v0.2.7 showed an optimistic "stopped" balloon even
+    /// when the supervisor had lost its in-memory process reference and
+    /// USBPcapCMD kept running for hours.
+    /// </summary>
+    private void PollUsbCaptureStopOutcome(DateTime requestedAtUtc)
+    {
+        // 10 s budget covers the 2 s supervisor poll cadence + Process.Kill
+        // + WaitForExit(5000). If a stop hasn't confirmed in 10 s, something
+        // is wrong and the user needs to know.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            int pid = 0;
+            string lastStop = "";
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
+                pid = (key?.GetValue("UsbCapturePid") as int?) ?? 0;
+                lastStop = key?.GetValue("UsbCaptureLastStop") as string ?? "";
+            }
+            catch { }
+
+            // PID cleared → no process recorded as running. Confirmed stop.
+            // LastStop newer than our request → supervisor handled this stop.
+            bool stopAcked = false;
+            if (pid == 0)
+            {
+                stopAcked = true;
+            }
+            else if (!string.IsNullOrEmpty(lastStop)
+                     && DateTime.TryParse(lastStop, null,
+                         System.Globalization.DateTimeStyles.RoundtripKind, out var lsUtc)
+                     && lsUtc >= requestedAtUtc)
+            {
+                stopAcked = true;
+            }
+
+            if (stopAcked)
+            {
+                _icon.ShowBalloonTip(4000, "OpenSAAB Collector",
+                    "USB capture confirmed stopped. The .pcapng will upload after a 30 s settle.",
+                    ToolTipIcon.Info);
+                return;
+            }
+            Thread.Sleep(500);
+        }
+
+        _icon.ShowBalloonTip(8000, "OpenSAAB Collector — Stop didn't confirm",
+            "The supervisor didn't confirm USBPcapCMD exited within 10 s. " +
+            "It may still be running. Check Event Viewer → Application → " +
+            "OpenSAABCollector, or kill USBPcapCMD.exe manually.",
             ToolTipIcon.Warning);
     }
 

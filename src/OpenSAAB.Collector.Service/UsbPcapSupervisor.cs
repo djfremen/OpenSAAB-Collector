@@ -31,6 +31,15 @@ public sealed class UsbPcapSupervisor : BackgroundService
     // Failure marker the tray polls to surface "couldn't start" to the user.
     // Empty string ("") = OK / no failure.
     private const string LastFailureValue = "UsbCaptureLastFailure";
+    // v0.2.7: PID of the USBPcapCMD process WE spawned. Persisted so a service
+    // restart doesn't orphan the running capture (pre-v0.2.7 bug: in-memory
+    // _proc was lost on restart → Stop became a silent no-op → tray said
+    // "stopped" while USBPcapCMD ran for hours).
+    private const string PidValue = "UsbCapturePid";
+    // v0.2.7: ISO-8601 UTC timestamp the supervisor writes after confirming
+    // a USBPcapCMD process actually exited. Tray polls this to give the user
+    // a definitive "stopped" balloon instead of an optimistic one.
+    private const string LastStopValue = "UsbCaptureLastStop";
 
     // Chipsoft Pro USB IDs — same values the cstech2win shim filters on.
     private const ushort ChipsoftVid = 0x0483;
@@ -56,6 +65,12 @@ public sealed class UsbPcapSupervisor : BackgroundService
         {
             while (await ticker.WaitForNextTickAsync(stop))
             {
+                // v0.2.7: before deciding running/requested, try to recover
+                // any orphaned process from a previous supervisor instance.
+                // Without this, a service restart silently abandoned the
+                // USBPcapCMD process and subsequent Stop calls did nothing.
+                TryAdoptOrphan();
+
                 var requested = ReadRequested();
                 var running = _proc is { HasExited: false };
                 if (requested && !running)
@@ -170,6 +185,7 @@ public sealed class UsbPcapSupervisor : BackgroundService
                 {
                     // Healthy: file is there and the process is alive.
                     WriteLastFile(_currentPath);
+                    WritePid(_proc.Id);                 // v0.2.7: persist PID for orphan recovery
                     WriteFailure("");  // clear any prior failure marker
                     _log.LogWarning(  // Warning level so EventLog actually shows it
                         "USBPcap capture started OK. file={Path} iface={Iface} pid={Pid}",
@@ -225,17 +241,36 @@ public sealed class UsbPcapSupervisor : BackgroundService
         var path = _currentPath;
         _proc = null;
         _currentPath = null;
-        if (p == null) return;
+
+        // v0.2.7: even if our in-memory _proc is null (service was restarted
+        // since spawn), recover the orphan from the persisted PID and kill
+        // it. Without this, Stop became a silent no-op and the orphaned
+        // USBPcapCMD ran indefinitely while the tray cheerfully said
+        // "stopped". Caught 2026-05-16 when a USBPcapCMD ran 21 hours
+        // straight after the user hit Stop.
+        if (p == null)
+        {
+            p = TryReclaimOrphanedProcess();
+        }
+
+        if (p == null)
+        {
+            // No process to stop, but still mark the stop event so the tray
+            // poll resolves cleanly instead of timing out.
+            WriteLastStop(DateTime.UtcNow);
+            WritePid(0);
+            return;
+        }
 
         try
         {
             if (!p.HasExited)
             {
-                // SIGTERM equivalent on Windows: Process.Kill is hard, but
-                // USBPcapCMD doesn't have a clean Ctrl+C path when stdin
-                // isn't a console; killing is safe because pcapng is written
-                // in self-contained blocks that don't need a footer.
-                p.Kill(entireProcessTree: false);
+                // entireProcessTree=true catches any child USBPcapCMD spawned
+                // (none expected, but cheap insurance). pcapng is written in
+                // self-contained blocks that don't need a footer, so a hard
+                // kill leaves the file readable.
+                p.Kill(entireProcessTree: true);
                 p.WaitForExit(5000);
             }
         }
@@ -247,6 +282,11 @@ public sealed class UsbPcapSupervisor : BackgroundService
         {
             try { p.Dispose(); } catch { }
         }
+
+        // Always clear the PID and stamp the stop time, even on partial
+        // success — the tray polls these to confirm.
+        WritePid(0);
+        WriteLastStop(DateTime.UtcNow);
 
         // Log at Warning so EventLog actually shows it (the default EventLog
         // provider filter on .NET 8 hides Information).
@@ -262,6 +302,80 @@ public sealed class UsbPcapSupervisor : BackgroundService
             _log.LogWarning("USBPcap capture stopped but output is missing or empty. file={Path} bytes={Bytes}", path, sz);
             WriteFailure($"Stopped but no output ({sz} bytes at {path})");
         }
+    }
+
+    /// <summary>
+    /// v0.2.7: on every poll, see whether a USBPcapCMD process we spawned
+    /// before a service restart is still running. If so, adopt it back into
+    /// <see cref="_proc"/> so the next StartCapture/StopCapture decision
+    /// reflects reality instead of in-memory amnesia.
+    /// </summary>
+    private void TryAdoptOrphan()
+    {
+        if (_proc is { HasExited: false }) return;  // already healthy
+
+        var (pid, lastFile) = ReadPidAndPath();
+        if (pid <= 0) return;  // no orphan known
+
+        Process? candidate = null;
+        try { candidate = Process.GetProcessById(pid); }
+        catch
+        {
+            // Orphan died on its own — clear the marker.
+            WritePid(0);
+            WriteLastStop(DateTime.UtcNow);
+            return;
+        }
+
+        // Verify it really is USBPcapCMD before adopting. After a PID is
+        // recycled by the OS, something else with the same PID could be
+        // running; we must not "adopt" — and certainly not Kill — that.
+        var name = SafeProcessName(candidate);
+        if (!string.Equals(name, "USBPcapCMD", StringComparison.OrdinalIgnoreCase))
+        {
+            _log.LogWarning("Persisted UsbCapturePid={Pid} now belongs to '{Name}', not USBPcapCMD. " +
+                            "Clearing the marker (a previous capture probably exited and the PID was reused).",
+                            pid, name ?? "?");
+            try { candidate.Dispose(); } catch { }
+            WritePid(0);
+            return;
+        }
+
+        _proc = candidate;
+        _currentPath = lastFile;
+        _log.LogWarning("Adopted orphaned USBPcapCMD pid={Pid} (likely survived a service restart). file={Path}",
+                        pid, lastFile ?? "<unknown>");
+    }
+
+    /// <summary>
+    /// Variant for StopCapture: if we don't have a live <c>_proc</c> handle
+    /// but the registry knows we spawned one, return the live Process for
+    /// killing. Different from <see cref="TryAdoptOrphan"/> only in that it
+    /// returns the Process directly rather than mutating <c>_proc</c> (the
+    /// caller is already in the middle of clearing state).
+    /// </summary>
+    private Process? TryReclaimOrphanedProcess()
+    {
+        var (pid, _) = ReadPidAndPath();
+        if (pid <= 0) return null;
+
+        Process? candidate = null;
+        try { candidate = Process.GetProcessById(pid); }
+        catch { return null; }
+
+        var name = SafeProcessName(candidate);
+        if (!string.Equals(name, "USBPcapCMD", StringComparison.OrdinalIgnoreCase))
+        {
+            try { candidate.Dispose(); } catch { }
+            return null;
+        }
+        _log.LogWarning("Reclaimed orphaned USBPcapCMD pid={Pid} during Stop — killing it now.", pid);
+        return candidate;
+    }
+
+    private static string? SafeProcessName(Process p)
+    {
+        try { return p.ProcessName; } catch { return null; }
     }
 
     private static bool ReadRequested()
@@ -310,6 +424,43 @@ public sealed class UsbPcapSupervisor : BackgroundService
             key.SetValue(LastFailureValue, reason ?? "", RegistryValueKind.String);
         }
         catch { }
+    }
+
+    /// <summary>v0.2.7: persist the spawned USBPcapCMD PID; 0 clears.</summary>
+    private static void WritePid(int pid)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
+            key.SetValue(PidValue, pid, RegistryValueKind.DWord);
+        }
+        catch { }
+    }
+
+    /// <summary>v0.2.7: ISO-8601 UTC timestamp of the most recent confirmed stop.</summary>
+    private static void WriteLastStop(DateTime utc)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
+            key.SetValue(LastStopValue, utc.ToString("O"), RegistryValueKind.String);
+        }
+        catch { }
+    }
+
+    /// <summary>v0.2.7: read persisted PID + last known capture path together.</summary>
+    private static (int Pid, string? LastFile) ReadPidAndPath()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
+            var pid = (key?.GetValue(PidValue) as int?) ?? 0;
+            var path = key?.GetValue(LastFileValue) as string;
+            return (pid, path);
+        }
+        catch { return (0, null); }
     }
 
     private static string? FindUsbPcapCmd()
