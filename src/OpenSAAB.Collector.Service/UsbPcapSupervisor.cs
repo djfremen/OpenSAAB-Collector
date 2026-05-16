@@ -101,34 +101,34 @@ public sealed class UsbPcapSupervisor : BackgroundService
         _currentPath = Path.Combine(Path.GetTempPath(), $"usbpcap_{wallMs}.pcapng");
 
         // Args breakdown:
-        //   -d <iface>      the USBPcap virtual interface (\\.\USBPcap1)
-        //   -s 96           --snaplen 96: cap each captured packet at 96 bytes.
-        //                   USBPcap pseudo-header (27 B) + chipsoft envelope
-        //                   (≤39 B) + ISO-TP / UDS payload (≤8 B per frame on
-        //                   single-frame transfers; ISO-TP CFs split larger
-        //                   payloads across multiple URBs anyway) → well under
-        //                   96 B for every routine chipsoft URB. Truncation is
-        //                   lossless for our use case and cuts file size on the
-        //                   long tail of buffered transfers.
-        //   --devices <n>   capture only the Chipsoft (USB Serial Device).
-        //                   Picked via --extcap-config below. Falls back to
-        //                   -A if the Chipsoft can't be identified (multi-
-        //                   serial-device hosts, weird enumeration). The win
-        //                   here is large: a 9.44 MB hub-wide capture from
-        //                   today's bench had only ~1.4% Chipsoft traffic;
-        //                   the other 98.6% was keyboard / fingerprint / etc.
-        //   -o <file>       output path.
+        //   -d <iface>  the USBPcap virtual interface (\\.\USBPcap1)
+        //   -s 96       --snaplen 96: cap each captured packet at 96 bytes.
+        //               USBPcap pseudo-header (27 B) + Chipsoft envelope
+        //               (≤39 B) + ISO-TP / UDS payload (≤8 B per frame on
+        //               single-frame transfers; ISO-TP CFs split larger
+        //               payloads across multiple URBs anyway) → well under
+        //               96 B for every routine chipsoft URB.
+        //   -A          --capture-from-all-devices: capture every device on
+        //               the chosen Root Hub. v0.2.2/v0.2.3 attempted
+        //               `--devices <Chipsoft-address>` via --extcap-config
+        //               probing, but Windows reassigns USB device addresses
+        //               whenever a device disconnects/reconnects (including
+        //               on service restarts that involve filter drivers), so
+        //               the probed address goes stale mid-walk and capture
+        //               silently records nothing. PickChipsoftAddress() is
+        //               kept below for future revival once we have a robust
+        //               way to track the Chipsoft by VID:PID through address
+        //               rotation events. For v0.2.4+ we accept larger file
+        //               sizes (raw ~10 MB, gz ~1 MB per ~70 s walk) in
+        //               exchange for 100 % capture reliability.
+        //   -o <file>   output path.
         // *Important*: missing both `-A` and `--devices` puts USBPcapCMD in
         // interactive mode (blocks on stdin asking which device). That's how
         // v0.2.0 silently produced no file. Always pass one of them.
-        var chipsoftAddr = PickChipsoftAddress(usbpcapCmd, iface);
-        var deviceFlag = chipsoftAddr != null ? $"--devices {chipsoftAddr}" : "-A";
-        var args = $"-d \"{iface}\" -s 96 {deviceFlag} -o \"{_currentPath}\"";
-        if (chipsoftAddr == null)
-            _log.LogWarning("Chipsoft Pro not auto-detected in USBPcap device list. " +
-                            "Falling back to hub-wide capture (-A). File will be larger.");
-        else
-            _log.LogWarning("Filtering capture to Chipsoft Pro USB device {Addr}.", chipsoftAddr);
+        var args = $"-d \"{iface}\" -s 96 -A -o \"{_currentPath}\"";
+        _log.LogWarning("Starting hub-wide USBPcap capture (-A) on {Iface}. " +
+                        "Device filter intentionally disabled in v0.2.4 — see PickChipsoftAddress comment.",
+                        iface);
         try
         {
             var psi = new ProcessStartInfo(usbpcapCmd, args)
