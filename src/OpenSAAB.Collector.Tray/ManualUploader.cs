@@ -17,7 +17,7 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.2.2";
+    private const string CollectorVersion = "0.2.3";
 
     /// <summary>Per-file outcome of <see cref="UploadOneAsync"/>.</summary>
     internal enum UploadResult

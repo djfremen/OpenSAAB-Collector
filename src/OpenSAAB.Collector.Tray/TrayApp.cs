@@ -169,16 +169,24 @@ internal sealed class TrayApp : ApplicationContext
             return;
         }
 
-        _icon.ShowBalloonTip(2000, "OpenSAAB Collector",
-            $"Uploading {candidates.Count} log(s)…",
-            ToolTipIcon.Info);
+        // Live progress dialog — v0.2.3+. With USBPcap captures landing as
+        // multi-MB .pcapng files the user wants visible reassurance that
+        // upload is making progress; balloon-only was opaque.
+        var progress = new UploadProgressForm(candidates.Count);
+        progress.Show();
+        Application.DoEvents();
 
         int ok = 0, skipped = 0, fail = 0;
         try
         {
             var uploader = ManualUploader.FromRegistry();
-            foreach (var path in candidates)
+            for (int i = 0; i < candidates.Count; i++)
             {
+                var path = candidates[i];
+                long sz = 0;
+                try { sz = new FileInfo(path).Length; } catch { }
+                progress.Tick(i, candidates.Count, path, sz);
+
                 var result = await uploader.UploadOneAsync(path);
                 switch (result)
                 {
@@ -187,25 +195,24 @@ internal sealed class TrayApp : ApplicationContext
                         IncrementUploadCount();
                         break;
                     case ManualUploader.UploadResult.LowValueDeleted:
-                        // Server rejected as noise; we deleted locally. Not a
-                        // failure (don't retry) and not a real upload (don't
-                        // count). Surface to the user so they know why the
-                        // candidate list shrunk.
                         skipped++;
                         break;
                     default:
                         fail++;
                         break;
                 }
+                progress.Tick(i + 1, candidates.Count, path, sz);
             }
         }
         catch (Exception ex)
         {
+            progress.Finish();
             _icon.ShowBalloonTip(5000, "OpenSAAB Collector",
                 $"Upload error: {ex.Message}",
                 ToolTipIcon.Error);
             return;
         }
+        progress.Finish();
 
         RefreshCountHeader();
         var icon = fail == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning;
@@ -281,7 +288,12 @@ internal sealed class TrayApp : ApplicationContext
     /// </summary>
     private void PollUsbCaptureOutcome(bool starting)
     {
-        var deadline = DateTime.UtcNow.AddSeconds(7);
+        // 15 s budget is enough for: 2 s supervisor poll cycle, 1-2 s
+        // `USBPcapCMD --extcap-config` device-list probe, ProcessStartInfo
+        // spawn, plus 3 s file-creation validation. v0.2.1 used 7 s which
+        // raced the device-pick probe and yielded false "status unknown"
+        // balloons even when the capture started fine.
+        var deadline = DateTime.UtcNow.AddSeconds(15);
         string? lastFile = null;
         string lastFailure = "";
 
