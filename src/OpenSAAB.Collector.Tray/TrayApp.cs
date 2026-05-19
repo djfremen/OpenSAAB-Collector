@@ -408,7 +408,7 @@ internal sealed class TrayApp : ApplicationContext
         }
 
         _icon.ShowBalloonTip(7000, "OpenSAAB Collector — USB capture status unknown",
-            "The service didn't confirm capture start within 7 s. Check Event Viewer → Application → OpenSAABCollector.",
+            "The service didn't confirm capture start within 15 s. Check Event Viewer → Application → OpenSAABCollector.",
             ToolTipIcon.Warning);
     }
 
