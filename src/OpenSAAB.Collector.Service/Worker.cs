@@ -28,6 +28,7 @@ public sealed class Worker : BackgroundService
     private readonly Uploader _uploader;
     private readonly ConcurrentDictionary<string, DateTime> _pending = new();
     private FileSystemWatcher? _watcher;
+    private FileSystemWatcher? _secondaryWatcher;
 
     public Worker(ILogger<Worker> log, InstallSettings settings, Uploader uploader)
     {
@@ -38,23 +39,104 @@ public sealed class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
-        var tempDir = Path.GetTempPath();
-        _log.LogInformation("OpenSAAB Collector starting. InstallId={InstallId} Watch={Dir} Endpoint={Url}",
-            _settings.InstallId, tempDir, _settings.IngestUrl);
+        // v0.3.0: watch ProgramData (Everyone:RWX, installer-ACL'd) instead of
+        // Path.GetTempPath(). The 2026-05-18 USBPcap diagnostic + event-log
+        // analysis revealed Worker.ExecuteAsync silently crashed at
+        // `new FileSystemWatcher(Path.GetTempPath())` on LocalSystem services
+        // (Win10+ per-service C:\Windows\SystemTemp ACL blocks the watcher
+        // even though writes succeed). UsbPcapSupervisor stayed alive, Worker
+        // died, and the FileSystemWatcher never fired — meaning every USBPcap
+        // capture got written to disk but never auto-uploaded. Contributors
+        // who never clicked Tray "Upload now" lost data silently.
+        //
+        // Two safety nets here:
+        // 1. Use the InstallSettings.CanonicalCaptureDir constant, which the
+        //    installer pre-creates with Everyone:RWX permissions.
+        // 2. Also watch Path.GetTempPath() as a secondary location so older
+        //    Tech2Win sessions (which write shim logs to user-%TEMP%) still
+        //    get picked up via the tray-process inheritance path.
+        // 3. Wrap FileSystemWatcher init in try/catch so even if BOTH paths
+        //    are inaccessible, the service stays alive with a diagnostic
+        //    event-log entry rather than silently dying.
+
+        var captureDir = InstallSettings.CanonicalCaptureDir;
+        var userTempDir = Path.GetTempPath();
+
+        try
+        {
+            if (!Directory.Exists(captureDir))
+            {
+                Directory.CreateDirectory(captureDir);
+                _log.LogInformation("Created canonical capture dir: {Dir}", captureDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(ex,
+                "Failed to create/access canonical capture dir {Dir}; falling back to %TEMP%",
+                captureDir);
+            captureDir = userTempDir;
+        }
+
+        _log.LogInformation(
+            "OpenSAAB Collector starting. InstallId={InstallId} Watch={Dir} (fallback={Fallback}) Endpoint={Url}",
+            _settings.InstallId, captureDir, userTempDir, _settings.IngestUrl);
 
         // Pick up any pre-existing logs that might have been left behind
-        // from before the service started.
-        EnqueueExisting(tempDir);
-
-        _watcher = new FileSystemWatcher(tempDir)
+        // from before the service started — both canonical and %TEMP%.
+        EnqueueExisting(captureDir);
+        if (captureDir != userTempDir)
         {
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-            EnableRaisingEvents = true,
-            IncludeSubdirectories = false,
-        };
-        _watcher.Created += OnFileEvent;
-        _watcher.Changed += OnFileEvent;
-        _watcher.Renamed += OnRenamed;
+            EnqueueExisting(userTempDir);
+        }
+
+        try
+        {
+            _watcher = new FileSystemWatcher(captureDir)
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                EnableRaisingEvents = true,
+                IncludeSubdirectories = false,
+            };
+            _watcher.Created += OnFileEvent;
+            _watcher.Changed += OnFileEvent;
+            _watcher.Renamed += OnRenamed;
+            _log.LogInformation("FileSystemWatcher attached to {Dir}", captureDir);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex,
+                "Failed to attach FileSystemWatcher to {Dir} — auto-upload pipeline disabled. " +
+                "Tray manual 'Upload now' button still works as fallback. " +
+                "Most likely cause: directory ACLs reject watch handle even though writes succeed (Win10+ SystemTemp behavior).",
+                captureDir);
+            // Don't return — keep the drain loop alive so manual-flush uploads still process the queue.
+        }
+
+        // Also watch %TEMP% as secondary path for legacy shim logs Tech2Win
+        // may write to the user temp from its own process context.
+        if (captureDir != userTempDir)
+        {
+            try
+            {
+                _secondaryWatcher = new FileSystemWatcher(userTempDir)
+                {
+                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                    EnableRaisingEvents = true,
+                    IncludeSubdirectories = false,
+                };
+                _secondaryWatcher.Created += OnFileEvent;
+                _secondaryWatcher.Changed += OnFileEvent;
+                _secondaryWatcher.Renamed += OnRenamed;
+                _log.LogInformation("Secondary FileSystemWatcher attached to {Dir}", userTempDir);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(ex,
+                    "Secondary watcher on {Dir} failed to attach (non-fatal — canonical dir still watched)",
+                    userTempDir);
+            }
+        }
 
         // Drain loop — every 5s, flush logs that have settled.
         var ticker = new PeriodicTimer(TimeSpan.FromSeconds(5));

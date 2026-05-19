@@ -10,7 +10,7 @@
 ;                         ..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.2.8"
+#define AppVersion     "0.3.0"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"
@@ -88,6 +88,18 @@ Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName:
 ; tray's IncrementUploadCount silently failed on HKLM permission denied).
 Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: dword; ValueName: "UploadCount"; ValueData: "0"; Permissions: users-modify; Flags: uninsdeletevalue createvalueifdoesntexist
 
+[Dirs]
+; v0.3.0: canonical capture directory shared by Worker (FileSystemWatcher
+; observes) and UsbPcapSupervisor (writes new .pcapng files). Pinned to
+; ProgramData with explicit Everyone:RWX so the LocalSystem service can
+; watch+write reliably regardless of how Windows resolves Path.GetTempPath()
+; for service accounts. The v0.2.x bug where the watcher attach silently
+; failed on per-service C:\Windows\SystemTemp ACLs is fixed by always
+; using this stable path. NOT uninstalled — keeps captures for debug.
+Name: "{commonpf}\..\..\ProgramData\OpenSAAB\Captures"; \
+    Permissions: everyone-modify; \
+    Flags: uninsneveruninstall
+
 [Run]
 ; --- Pre-install: refuse if Chipsoft isn't there. Done in [Code] PrepareToInstall. ---
 
@@ -105,7 +117,7 @@ Filename: "{cmd}"; \
 Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= ""\""{app}\OpenSAAB.Collector.Service.exe\"""" start= auto DisplayName= ""OpenSAAB Collector"""; \
     StatusMsg: "Installing OpenSAAB Collector service…"; \
     Flags: runhidden waituntilterminated
-Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""Watches %TEMP% for shim logs from Tech2Win / J2534 clients and uploads to openSAAB.com if consent given."""; \
+Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""Watches C:\ProgramData\OpenSAAB\Captures and %TEMP% for shim logs + USBPcap captures from Tech2Win / J2534 clients and uploads to openSAAB.com if consent given."""; \
     Flags: runhidden waituntilterminated
 Filename: "{sys}\sc.exe"; Parameters: "start {#ServiceName}"; \
     StatusMsg: "Starting OpenSAAB Collector service…"; \

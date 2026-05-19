@@ -27,6 +27,11 @@ public sealed class UsbPcapSupervisor : BackgroundService
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string RequestedValue = "UsbCaptureRequested";
+    // v0.3.0: tray's "Auto-capture next Tech2Win launch" arms this flag.
+    // Supervisor polls for `emulator.exe` / `Tech2Win.exe`; when seen,
+    // it auto-starts the capture (clearing the armed flag so it's
+    // one-shot) and auto-stops 5 s after the watched process exits.
+    private const string Tech2WinArmedValue = "Tech2WinAutoCaptureArmed";
     private const string LastFileValue = "UsbCaptureLastFile";
     // Failure marker the tray polls to surface "couldn't start" to the user.
     // Empty string ("") = OK / no failure.
@@ -48,6 +53,11 @@ public sealed class UsbPcapSupervisor : BackgroundService
     private readonly ILogger<UsbPcapSupervisor> _log;
     private Process? _proc;
     private string? _currentPath;
+    // v0.3.0: PID of the Tech2Win process this supervisor session is tracking
+    // (only set when started via Tech2WinAutoCaptureArmed). When that process
+    // exits + 5 s settle, the supervisor auto-stops the capture.
+    private int _watchedTech2WinPid = 0;
+    private DateTime? _watchedTech2WinExitedAt = null;
 
     public UsbPcapSupervisor(ILogger<UsbPcapSupervisor> log)
     {
@@ -70,6 +80,43 @@ public sealed class UsbPcapSupervisor : BackgroundService
                 // Without this, a service restart silently abandoned the
                 // USBPcapCMD process and subsequent Stop calls did nothing.
                 TryAdoptOrphan();
+
+                // v0.3.0: if armed, scan for emulator.exe / Tech2Win.exe.
+                // When seen, auto-arm UsbCaptureRequested = 1 AND record the
+                // PID so we can auto-stop when it exits + 5 s settle.
+                var armed = ReadDword(Tech2WinArmedValue);
+                if (armed == 1 && _watchedTech2WinPid == 0)
+                {
+                    var pid = FindTech2WinPid();
+                    if (pid != 0)
+                    {
+                        _log.LogInformation("Tech2Win launch detected (pid={Pid}) — auto-arming USBPcap capture.", pid);
+                        _watchedTech2WinPid = pid;
+                        _watchedTech2WinExitedAt = null;
+                        WriteRequested(true);
+                        // Clear armed flag so it's one-shot.
+                        WriteDword(Tech2WinArmedValue, 0);
+                    }
+                }
+
+                // v0.3.0: if we're tracking a Tech2Win process, watch for exit.
+                if (_watchedTech2WinPid != 0)
+                {
+                    var stillAlive = ProcessAliveByPid(_watchedTech2WinPid);
+                    if (!stillAlive && _watchedTech2WinExitedAt == null)
+                    {
+                        _log.LogInformation("Tracked Tech2Win pid={Pid} exited — auto-stop USBPcap in 5 s.", _watchedTech2WinPid);
+                        _watchedTech2WinExitedAt = DateTime.UtcNow;
+                    }
+                    if (_watchedTech2WinExitedAt is { } exitedAt
+                        && (DateTime.UtcNow - exitedAt).TotalSeconds >= 5)
+                    {
+                        _log.LogInformation("5 s settle elapsed — stopping auto-armed USBPcap.");
+                        WriteRequested(false);
+                        _watchedTech2WinPid = 0;
+                        _watchedTech2WinExitedAt = null;
+                    }
+                }
 
                 var requested = ReadRequested();
                 var running = _proc is { HasExited: false };
@@ -113,7 +160,25 @@ public sealed class UsbPcapSupervisor : BackgroundService
         }
 
         var wallMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        _currentPath = Path.Combine(Path.GetTempPath(), $"usbpcap_{wallMs}.pcapng");
+        // v0.3.0: write to canonical capture dir (Everyone:RWX, installer-ACL'd)
+        // so Worker.FileSystemWatcher can reliably observe new pcapng files.
+        // Previously used Path.GetTempPath() which on LocalSystem services
+        // resolves to C:\Windows\SystemTemp\ — writable but blocks FSWatcher
+        // attach, silently killing the auto-upload pipeline.
+        var captureDir = InstallSettings.CanonicalCaptureDir;
+        try
+        {
+            if (!Directory.Exists(captureDir))
+            {
+                Directory.CreateDirectory(captureDir);
+            }
+        }
+        catch
+        {
+            // Fall back to %TEMP% if ProgramData isn't accessible for any reason.
+            captureDir = Path.GetTempPath();
+        }
+        _currentPath = Path.Combine(captureDir, $"usbpcap_{wallMs}.pcapng");
 
         // Args breakdown:
         //   -d <iface>  the USBPcap virtual interface (\\.\USBPcap1)
@@ -397,6 +462,66 @@ public sealed class UsbPcapSupervisor : BackgroundService
             key.SetValue(RequestedValue, v ? 1 : 0, RegistryValueKind.DWord);
         }
         catch { /* best effort */ }
+    }
+
+    /// <summary>v0.3.0: generic registry DWORD read for the auto-arm flag.</summary>
+    private static int ReadDword(string name)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
+            return key?.GetValue(name) as int? ?? 0;
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>v0.3.0: generic registry DWORD write for the auto-arm flag.</summary>
+    private static void WriteDword(string name, int v)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
+            key.SetValue(name, v, RegistryValueKind.DWord);
+        }
+        catch { /* best effort */ }
+    }
+
+    /// <summary>
+    /// v0.3.0: find the PID of a running Tech2Win-family process. Returns 0
+    /// if none. Looks for `emulator` (the Tech2Win diagnostic engine — runs
+    /// even when the GUI window is closed) and `Tech2Win` (the older shell
+    /// process). Multiple processes with the same name → returns the first.
+    /// </summary>
+    private static int FindTech2WinPid()
+    {
+        try
+        {
+            foreach (var name in new[] { "emulator", "Tech2Win" })
+            {
+                var procs = Process.GetProcessesByName(name);
+                if (procs.Length > 0)
+                {
+                    var pid = procs[0].Id;
+                    foreach (var p in procs) p.Dispose();
+                    return pid;
+                }
+            }
+        }
+        catch { }
+        return 0;
+    }
+
+    /// <summary>v0.3.0: cheap "is pid X still running" check.</summary>
+    private static bool ProcessAliveByPid(int pid)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(pid);
+            return !p.HasExited;
+        }
+        catch (ArgumentException) { return false; }  // process not found
+        catch { return false; }
     }
 
     private static void WriteLastFile(string path)

@@ -69,6 +69,13 @@ internal sealed class TrayApp : ApplicationContext
         RefreshUsbCaptureItems();
         _menu.Items.Add(_startUsbCapture);
         _menu.Items.Add(_stopUsbCapture);
+        // v0.3.0 — "Auto-capture next Tech2Win launch": tray arms a flag, the
+        // service's UsbPcapSupervisor polls for emulator.exe / Tech2Win.exe
+        // and starts USBPcap automatically when it sees one, then stops 5 s
+        // after the process exits. Closes the "contributors miss the init
+        // 25 s of Tech2Win" gap — Tech2Win's full PDUSetComParam burst is in
+        // the first 25 s of any session, and manual timing usually misses it.
+        _menu.Items.Add("🎯 Auto-capture next Tech2Win launch", null, (_, _) => ArmTech2WinAutoCapture());
         _menu.Items.Add(new ToolStripSeparator());
 
         _menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
@@ -221,6 +228,47 @@ internal sealed class TrayApp : ApplicationContext
         if (fail > 0) parts.Add($"failed {fail}");
         var msg = string.Join(", ", parts) + $". Captures total: {ReadUploadCount()}.";
         _icon.ShowBalloonTip(4000, "OpenSAAB Collector", msg, icon);
+    }
+
+    /// <summary>
+    /// Arm auto-capture for the next Tech2Win launch (v0.3.0). Sets
+    /// `Tech2WinAutoCaptureArmed = 1` in HKLM. The service's UsbPcapSupervisor
+    /// polls this; when set AND emulator.exe / Tech2Win.exe enters the
+    /// process list, it auto-starts USBPcap. When the process exits + 5 s
+    /// settle, it auto-stops. Clears the armed flag on either start (so it's
+    /// a one-shot) or explicit user cancel via Stop USB capture.
+    /// </summary>
+    private void ArmTech2WinAutoCapture()
+    {
+        if (!UsbPcapIsInstalled())
+        {
+            MessageBox.Show(
+                "USBPcap doesn't appear to be installed. Auto-capture requires it.\n\n" +
+                "Install from https://desowin.org/usbpcap/",
+                "OpenSAAB Collector — USBPcap missing",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
+                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
+            key.SetValue("Tech2WinAutoCaptureArmed", 1, RegistryValueKind.DWord);
+            key.SetValue("UsbCaptureLastFailure", "", RegistryValueKind.String);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Failed to set armed flag: {ex.Message}",
+                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+        _icon.ShowBalloonTip(6000,
+            "OpenSAAB Collector — Auto-capture armed",
+            "Launch Tech2Win now. USBPcap will start automatically and capture " +
+            "the full session including the channel-open / ComParam burst " +
+            "(the first 25 s usually missed by manual timing). Capture stops " +
+            "5 s after Tech2Win exits.",
+            ToolTipIcon.Info);
     }
 
     /// <summary>

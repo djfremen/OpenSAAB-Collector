@@ -19,7 +19,17 @@ public sealed class InstallSettings
     public string ConsentVersion { get; set; } = string.Empty;
     public string? VehicleYear { get; set; }
     public string? VehicleModel { get; set; }
-    public string CollectorVersion => "0.2.7";
+    public string CollectorVersion => "0.3.0";
+
+    /// <summary>
+    /// Canonical capture directory shared by Worker (watch) + UsbPcapSupervisor
+    /// (write). Pinned to ProgramData with explicit Everyone:RWX ACL set by
+    /// the installer, NOT %TEMP% — the per-service SystemTemp ACL Windows 10+
+    /// applies to LocalSystem services breaks the FileSystemWatcher init,
+    /// silently killing the auto-upload pipeline (v0.2.x bug discovered
+    /// 2026-05-18 via Worker LogInformation absence in event log).
+    /// </summary>
+    public static string CanonicalCaptureDir => @"C:\ProgramData\OpenSAAB\Captures";
 
     public static InstallSettings Load()
     {
