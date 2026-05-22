@@ -4,27 +4,23 @@ using System.Text;
 namespace OpenSAAB.Collector.Tray;
 
 /// <summary>
-/// Live tail of the freshest shim log in %TEMP%. Auto-switches when a
-/// newer cstech2win_shim_*.log or j2534_shim_*.log file appears.
+/// Live tail of the freshest Chipsoft driver log in
+/// <c>C:\ProgramData\CHIPSOFT_J2534\logs\</c>. Auto-switches when the driver
+/// opens a newer <c>YYYYMMDD_HHMMSS.log</c> file (each Tech2Win session).
 ///
-/// Color coding:
-///   TX / REQ-PDU   → blue
-///   RX / RSP-UDS   → green
-///   NRC ($7F …)    → red
-///   everything else → light gray
+/// Note: the driver's log lines are obfuscated on the wire — the live tail
+/// shows raw activity, not decoded UDS. Decoding happens server-side.
 ///
 /// Capped to the last 5000 lines to keep memory bounded.
 /// </summary>
 internal sealed class LogConsoleForm : Form
 {
     private const int MaxLines = 5000;
-    // Three log families:
-    //   cstech2win_shim_*  — Tech2Win + real adapter
-    //   j2534_shim_*       — J2534 client + real adapter
-    //   fremsoft_*         — FremSoft playback/standalone (no adapter)
-    private static readonly string[] LogPrefixes = [
-        "cstech2win_shim_", "j2534_shim_", "fremsoft_"
-    ];
+
+    /// <summary>The Chipsoft driver's Boost.Log output directory.</summary>
+    private static string ChipsoftLogsDir => Path.Combine(
+        Environment.GetEnvironmentVariable("ALLUSERSPROFILE") ?? @"C:\ProgramData",
+        "CHIPSOFT_J2534", "logs");
 
     private readonly RichTextBox _box;
     private readonly Label _statusLabel;
@@ -52,7 +48,7 @@ internal sealed class LogConsoleForm : Form
             ForeColor = Color.FromArgb(156, 168, 184),
             BackColor = Color.FromArgb(19, 24, 34),
             TextAlign = ContentAlignment.MiddleLeft,
-            Text = "Waiting for shim activity in %TEMP%…",
+            Text = "Waiting for Chipsoft driver activity…",
         };
 
         var toolbar = new FlowLayoutPanel
@@ -93,7 +89,7 @@ internal sealed class LogConsoleForm : Form
             BackColor = Color.FromArgb(26, 33, 46),
         };
         openDirBtn.FlatAppearance.BorderColor = Color.FromArgb(50, 60, 80);
-        openDirBtn.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", Path.GetTempPath()) { UseShellExecute = true });
+        openDirBtn.Click += (_, _) => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", ChipsoftLogsDir) { UseShellExecute = true });
         toolbar.Controls.AddRange(new Control[] { pauseBtn, clearBtn, openDirBtn });
 
         _box = new RichTextBox
@@ -113,8 +109,10 @@ internal sealed class LogConsoleForm : Form
         Controls.Add(toolbar);
         Controls.Add(_statusLabel);
 
-        // Watch the temp dir for new shim logs.
-        _dirWatcher = new FileSystemWatcher(Path.GetTempPath())
+        // Watch the Chipsoft logs dir for new session logs. Ensure it exists
+        // first — FileSystemWatcher's ctor throws on a missing directory.
+        try { Directory.CreateDirectory(ChipsoftLogsDir); } catch { }
+        _dirWatcher = new FileSystemWatcher(ChipsoftLogsDir)
         {
             NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
             EnableRaisingEvents = true,
@@ -130,21 +128,15 @@ internal sealed class LogConsoleForm : Form
         MaybeSwitchToFreshest();
     }
 
-    private static bool IsShimLog(string name)
-    {
-        if (string.IsNullOrEmpty(name)) return false;
-        if (!name.EndsWith(".log", StringComparison.OrdinalIgnoreCase)) return false;
-        foreach (var p in LogPrefixes)
-            if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
-    }
+    private static bool IsDriverLog(string name) =>
+        !string.IsNullOrEmpty(name) && name.EndsWith(".log", StringComparison.OrdinalIgnoreCase);
 
     private void MaybeSwitchToFreshest()
     {
         try
         {
-            var newest = Directory.EnumerateFiles(Path.GetTempPath(), "*.log")
-                .Where(p => IsShimLog(Path.GetFileName(p)))
+            var newest = Directory.EnumerateFiles(ChipsoftLogsDir, "*.log")
+                .Where(p => IsDriverLog(Path.GetFileName(p)))
                 .Select(p => new FileInfo(p))
                 .OrderByDescending(f => f.LastWriteTimeUtc)
                 .FirstOrDefault();

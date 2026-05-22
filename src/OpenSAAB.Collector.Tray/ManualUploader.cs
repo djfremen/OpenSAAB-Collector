@@ -6,9 +6,11 @@ namespace OpenSAAB.Collector.Tray;
 
 /// <summary>
 /// Tray-side "Upload now" path. Reads InstallSettings from the registry,
-/// gzips and POSTs each pending shim log, renames successful uploads to
-/// .uploaded so the service's FileSystemWatcher skips them on its 30 s
-/// settle pass.
+/// gzips and POSTs each pending Chipsoft driver log, deletes successful
+/// uploads so the service's FileSystemWatcher skips them.
+///
+/// v0.4.0: captures are the genuine Chipsoft driver's own Boost.Log files in
+/// <see cref="ChipsoftLogsDir"/> — the DLL-shim model is retired.
 ///
 /// Standalone from the Service's Uploader to keep the tray a single-binary
 /// drop-in with no project reference to the Service.
@@ -17,7 +19,12 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.2.7";
+    private const string CollectorVersion = "0.4.0";
+
+    /// <summary>The Chipsoft driver's Boost.Log output directory.</summary>
+    internal static string ChipsoftLogsDir => Path.Combine(
+        Environment.GetEnvironmentVariable("ALLUSERSPROFILE") ?? @"C:\ProgramData",
+        "CHIPSOFT_J2534", "logs");
 
     /// <summary>Per-file outcome of <see cref="UploadOneAsync"/>.</summary>
     internal enum UploadResult
@@ -29,11 +36,6 @@ internal sealed class ManualUploader
         /// <summary>Transient or unknown error; file kept for the next pass.</summary>
         Failed,
     }
-
-    private static readonly string[] LogPrefixes =
-    {
-        "cstech2win_shim_", "j2534_shim_",
-    };
 
     private static readonly HttpClient Http = new(new HttpClientHandler { UseProxy = true })
     {
@@ -76,48 +78,21 @@ internal sealed class ManualUploader
     }
 
     /// <summary>
-    /// Enumerate pending captures across all TEMP locations the Collector can
-    /// write to. Shim logs land in the user's %TEMP% (CSTech2Win.dll runs in
-    /// Tech2Win's user process); USBPcap captures land in
-    /// <c>C:\Windows\SystemTemp</c> because UsbPcapSupervisor runs as LocalSystem
-    /// and its <c>Path.GetTempPath()</c> resolves there. We scan both.
+    /// Enumerate pending captures: every non-empty <c>*.log</c> the Chipsoft
+    /// driver has written into <see cref="ChipsoftLogsDir"/>.
     /// </summary>
-    public static List<string> FindPendingLogs(string userTempDir)
+    public static List<string> FindPendingLogs()
     {
         var results = new List<string>();
-        var dirs = new List<string> { userTempDir };
-        // LocalSystem's TEMP (where the supervisor drops pcaps).
-        var systemTemp = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "SystemTemp");
-        if (Directory.Exists(systemTemp)) dirs.Add(systemTemp);
-
-        foreach (var dir in dirs)
+        try
         {
-            try
+            foreach (var path in Directory.EnumerateFiles(ChipsoftLogsDir, "*.log"))
             {
-                // Shim text logs (cstech2win, j2534) — userTempDir mostly,
-                // but cheap to look in both.
-                foreach (var path in Directory.EnumerateFiles(dir, "*.log"))
-                {
-                    var name = Path.GetFileName(path);
-                    foreach (var p in LogPrefixes)
-                    {
-                        if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase))
-                        {
-                            try { if (new FileInfo(path).Length > 0) results.Add(path); }
-                            catch { }
-                            break;
-                        }
-                    }
-                }
-                // USBPcap captures (.pcapng) — usually SystemTemp.
-                foreach (var path in Directory.EnumerateFiles(dir, "usbpcap_*.pcapng"))
-                {
-                    try { if (new FileInfo(path).Length > 24) results.Add(path); }  // skip SHB-only stubs
-                    catch { }
-                }
+                try { if (new FileInfo(path).Length > 0) results.Add(path); }
+                catch { }
             }
-            catch { /* unreadable dir — keep scanning the others */ }
         }
+        catch { /* dir missing or unreadable — nothing pending */ }
         return results;
     }
 
@@ -126,9 +101,12 @@ internal sealed class ManualUploader
         byte[] bytes;
         try
         {
-            // FileShare.ReadWrite | Delete: shim and service may have it open.
+            // FileShare.None — succeeds only once the Chipsoft driver has
+            // released the log (session ended). An in-progress session log
+            // stays locked, so "Upload now" never ships a partial capture;
+            // the user uploads it after closing Tech2Win.
             using var fs = new FileStream(path, FileMode.Open, FileAccess.Read,
-                FileShare.ReadWrite | FileShare.Delete);
+                FileShare.None);
             using var ms = new MemoryStream();
             await fs.CopyToAsync(ms);
             bytes = ms.ToArray();
@@ -138,25 +116,6 @@ internal sealed class ManualUploader
             return UploadResult.Failed;
         }
         if (bytes.Length == 0) return UploadResult.Failed;
-
-        // v0.2.5+: pre-upload pcap integrity check. Stops malformed captures
-        // from entering the retry loop. Service-side Worker does the same;
-        // doubling up because ManualUploader can be invoked when the service
-        // hasn't yet run on the file.
-        if (path.EndsWith(".pcapng", StringComparison.OrdinalIgnoreCase))
-        {
-            if (bytes.Length < 24) { try { File.Delete(path); } catch { } return UploadResult.LowValueDeleted; }
-            uint magic = (uint)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
-            uint network = (uint)(bytes[20] | (bytes[21] << 8) | (bytes[22] << 16) | (bytes[23] << 24));
-            if (magic != 0xA1B2C3D4u && magic != 0xA1B23C4Du) {
-                try { File.Delete(path); } catch { }
-                return UploadResult.LowValueDeleted;
-            }
-            if (network != 249 || bytes.Length == 24) {
-                try { File.Delete(path); } catch { }
-                return UploadResult.LowValueDeleted;
-            }
-        }
 
         byte[] gzipped;
         using (var ms = new MemoryStream())
@@ -168,16 +127,8 @@ internal sealed class ManualUploader
             gzipped = ms.ToArray();
         }
 
-        var fname = Path.GetFileName(path);
-        string source;
-        if (fname.StartsWith("cstech2win_shim_", StringComparison.Ordinal))
-            source = "cstech2win";
-        else if (fname.StartsWith("j2534_shim_", StringComparison.Ordinal))
-            source = "j2534";
-        else if (fname.StartsWith("usbpcap_", StringComparison.Ordinal))
-            source = "usbpcap";
-        else
-            source = "cstech2win";  // unreachable given FindPendingLogs filter
+        // v0.4.0: every capture is a genuine Chipsoft driver log.
+        const string source = "chipsoft";
 
         using var req = new HttpRequestMessage(HttpMethod.Post, _ingestUrl)
         {
@@ -222,10 +173,10 @@ internal sealed class ManualUploader
         }
 
         // Server has it (or rejected it as noise) — drop the local copy so the
-        // same log can never ship twice. If delete fails (file still held open
-        // by an active Tech2Win shim session in %TEMP%), fall back to renaming
-        // so the next "Upload now" pass skips it. v0.1.6: server-side
-        // persistence is on R2 now, so client deletion is safe.
+        // same log can never ship twice. We opened the file FileShare.None
+        // above, so the driver had let go of it; delete should succeed.
+        // If it somehow doesn't, fall back to renaming so the next pass skips
+        // it. Server-side persistence is on R2, so client deletion is safe.
         try
         {
             File.Delete(path);

@@ -6,29 +6,29 @@ using Microsoft.Win32;
 namespace OpenSAAB.Collector.Service;
 
 /// <summary>
-/// Watches %TEMP% for shim logs (cstech2win_shim_*.log, j2534_shim_*.log).
-/// On rotation (file untouched for SettleSeconds), gzips and hands to
-/// the Uploader.
+/// v0.4.0: the DLL-shim model is retired. The Collector now switches on the
+/// genuine Chipsoft driver's OWN Boost.Log sink (<c>LogLevel: 0</c> in
+/// options.json, applied by <see cref="ChipsoftConfig"/>) and harvests the
+/// <c>*.log</c> files the driver writes into
+/// <c>C:\ProgramData\CHIPSOFT_J2534\logs\</c>.
 ///
-/// "Rotation" detection: the shims open a fresh log file each time the
-/// host process attaches; the previous file is then never written again.
-/// We treat any file that hasn't been touched in 30 seconds AND whose
-/// process owner has dropped its handle as ready to upload.
+/// "Ready to upload" detection: the driver keeps its ACTIVE session log open
+/// for the whole Tech2Win / J2534 session (a Boost.Log file sink). A previous
+/// session's log is closed and can be opened exclusively. So a log is ready
+/// when (a) it has settled — untouched for <see cref="SettleSeconds"/> — AND
+/// (b) it can be opened with <c>FileShare.None</c>, proving the driver has let
+/// go of it. This is strictly more reliable than the old rotation heuristic:
+/// a partial in-progress session log can never be uploaded by mistake.
 /// </summary>
 public sealed class Worker : BackgroundService
 {
     private const int SettleSeconds = 30;
-    // Shim log prefixes (.log) — cstech2win + j2534
-    private static readonly string[] LogPrefixes = ["cstech2win_shim_", "j2534_shim_"];
-    // USBPcap output prefix (.pcapng) — written by UsbPcapSupervisor
-    private const string UsbpcapPrefix = "usbpcap_";
 
     private readonly ILogger<Worker> _log;
     private readonly InstallSettings _settings;
     private readonly Uploader _uploader;
     private readonly ConcurrentDictionary<string, DateTime> _pending = new();
     private FileSystemWatcher? _watcher;
-    private FileSystemWatcher? _secondaryWatcher;
 
     public Worker(ILogger<Worker> log, InstallSettings settings, Uploader uploader)
     {
@@ -39,60 +39,34 @@ public sealed class Worker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stop)
     {
-        // v0.3.0: watch ProgramData (Everyone:RWX, installer-ACL'd) instead of
-        // Path.GetTempPath(). The 2026-05-18 USBPcap diagnostic + event-log
-        // analysis revealed Worker.ExecuteAsync silently crashed at
-        // `new FileSystemWatcher(Path.GetTempPath())` on LocalSystem services
-        // (Win10+ per-service C:\Windows\SystemTemp ACL blocks the watcher
-        // even though writes succeed). UsbPcapSupervisor stayed alive, Worker
-        // died, and the FileSystemWatcher never fired — meaning every USBPcap
-        // capture got written to disk but never auto-uploaded. Contributors
-        // who never clicked Tray "Upload now" lost data silently.
-        //
-        // Two safety nets here:
-        // 1. Use the InstallSettings.CanonicalCaptureDir constant, which the
-        //    installer pre-creates with Everyone:RWX permissions.
-        // 2. Also watch Path.GetTempPath() as a secondary location so older
-        //    Tech2Win sessions (which write shim logs to user-%TEMP%) still
-        //    get picked up via the tray-process inheritance path.
-        // 3. Wrap FileSystemWatcher init in try/catch so even if BOTH paths
-        //    are inaccessible, the service stays alive with a diagnostic
-        //    event-log entry rather than silently dying.
+        // Step 1: switch on the driver's native logging. Idempotent.
+        ChipsoftConfig.EnsureLogLevelZero(_log);
 
-        var captureDir = InstallSettings.CanonicalCaptureDir;
-        var userTempDir = Path.GetTempPath();
+        var logsDir = InstallSettings.ChipsoftLogsDir;
 
         try
         {
-            if (!Directory.Exists(captureDir))
+            if (!Directory.Exists(logsDir))
             {
-                Directory.CreateDirectory(captureDir);
-                _log.LogInformation("Created canonical capture dir: {Dir}", captureDir);
+                Directory.CreateDirectory(logsDir);
+                _log.LogInformation("Created Chipsoft logs dir: {Dir}", logsDir);
             }
         }
         catch (Exception ex)
         {
-            _log.LogWarning(ex,
-                "Failed to create/access canonical capture dir {Dir}; falling back to %TEMP%",
-                captureDir);
-            captureDir = userTempDir;
+            _log.LogWarning(ex, "Could not create Chipsoft logs dir {Dir}", logsDir);
         }
 
         _log.LogInformation(
-            "OpenSAAB Collector starting. InstallId={InstallId} Watch={Dir} (fallback={Fallback}) Endpoint={Url}",
-            _settings.InstallId, captureDir, userTempDir, _settings.IngestUrl);
+            "OpenSAAB Collector v{Version} starting. InstallId={InstallId} Watch={Dir} Endpoint={Url}",
+            _settings.CollectorVersion, _settings.InstallId, logsDir, _settings.IngestUrl);
 
-        // Pick up any pre-existing logs that might have been left behind
-        // from before the service started — both canonical and %TEMP%.
-        EnqueueExisting(captureDir);
-        if (captureDir != userTempDir)
-        {
-            EnqueueExisting(userTempDir);
-        }
+        // Pick up logs left behind from before the service started.
+        EnqueueExisting(logsDir);
 
         try
         {
-            _watcher = new FileSystemWatcher(captureDir)
+            _watcher = new FileSystemWatcher(logsDir)
             {
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
                 EnableRaisingEvents = true,
@@ -101,44 +75,18 @@ public sealed class Worker : BackgroundService
             _watcher.Created += OnFileEvent;
             _watcher.Changed += OnFileEvent;
             _watcher.Renamed += OnRenamed;
-            _log.LogInformation("FileSystemWatcher attached to {Dir}", captureDir);
+            _log.LogInformation("FileSystemWatcher attached to {Dir}", logsDir);
         }
         catch (Exception ex)
         {
             _log.LogError(ex,
-                "Failed to attach FileSystemWatcher to {Dir} — auto-upload pipeline disabled. " +
-                "Tray manual 'Upload now' button still works as fallback. " +
-                "Most likely cause: directory ACLs reject watch handle even though writes succeed (Win10+ SystemTemp behavior).",
-                captureDir);
-            // Don't return — keep the drain loop alive so manual-flush uploads still process the queue.
+                "Failed to attach FileSystemWatcher to {Dir} — auto-upload disabled. " +
+                "Tray manual 'Upload now' button still works as fallback.",
+                logsDir);
+            // Don't return — keep the drain loop alive so manual flushes still work.
         }
 
-        // Also watch %TEMP% as secondary path for legacy shim logs Tech2Win
-        // may write to the user temp from its own process context.
-        if (captureDir != userTempDir)
-        {
-            try
-            {
-                _secondaryWatcher = new FileSystemWatcher(userTempDir)
-                {
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                    EnableRaisingEvents = true,
-                    IncludeSubdirectories = false,
-                };
-                _secondaryWatcher.Created += OnFileEvent;
-                _secondaryWatcher.Changed += OnFileEvent;
-                _secondaryWatcher.Renamed += OnRenamed;
-                _log.LogInformation("Secondary FileSystemWatcher attached to {Dir}", userTempDir);
-            }
-            catch (Exception ex)
-            {
-                _log.LogWarning(ex,
-                    "Secondary watcher on {Dir} failed to attach (non-fatal — canonical dir still watched)",
-                    userTempDir);
-            }
-        }
-
-        // Drain loop — every 5s, flush logs that have settled.
+        // Drain loop — every 5s, flush logs that have settled and closed.
         var ticker = new PeriodicTimer(TimeSpan.FromSeconds(5));
         try
         {
@@ -186,13 +134,12 @@ public sealed class Worker : BackgroundService
         foreach (var (path, lastSeen) in _pending.ToArray())
         {
             if ((now - lastSeen).TotalSeconds < SettleSeconds) continue;
-            // File hasn't been touched in SettleSeconds — try to upload.
             if (!File.Exists(path))
             {
                 _pending.TryRemove(path, out _);
                 continue;
             }
-            // Check the file's actual mtime in case events came in late.
+            // Re-check the file's actual mtime in case events came in late.
             var mtime = File.GetLastWriteTimeUtc(path);
             if ((now - mtime).TotalSeconds < SettleSeconds)
             {
@@ -200,7 +147,6 @@ public sealed class Worker : BackgroundService
                 continue;
             }
             await ProcessOneAsync(path, stop);
-            _pending.TryRemove(path, out _);
         }
     }
 
@@ -209,34 +155,53 @@ public sealed class Worker : BackgroundService
         if (!_settings.UploadEnabled || string.IsNullOrEmpty(_settings.ConsentVersion))
         {
             _log.LogDebug("Upload disabled or no consent — leaving {Path} local", path);
+            _pending.TryRemove(path, out _);
+            return;
+        }
+
+        byte[] bytes;
+        try
+        {
+            // FileShare.None — succeeds ONLY if no other process holds the
+            // file. The Chipsoft driver keeps its active-session log open, so
+            // this exclusive open fails for an in-progress session and
+            // succeeds once the session has ended and the driver unloaded.
+            // That makes it our "the driver is done with this file" gate.
+            await using var fs = new FileStream(
+                path, FileMode.Open, FileAccess.Read, FileShare.None);
+            bytes = new byte[fs.Length];
+            int off = 0;
+            while (off < bytes.Length)
+            {
+                int n = await fs.ReadAsync(bytes.AsMemory(off), stop);
+                if (n == 0) break;
+                off += n;
+            }
+        }
+        catch (IOException)
+        {
+            // Driver still has the log open (active Tech2Win session) — retry.
+            _log.LogDebug("{Path} still held by the Chipsoft driver — will retry", path);
+            _pending[path] = DateTime.UtcNow;
+            return;
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Could not read {Path}", path);
+            _pending.TryRemove(path, out _);
+            return;
+        }
+
+        if (bytes.Length == 0)
+        {
+            _log.LogDebug("Skipping empty {Path}", path);
+            _pending.TryRemove(path, out _);
+            try { File.Delete(path); } catch { }
             return;
         }
 
         try
         {
-            var bytes = await File.ReadAllBytesAsync(path, stop);
-            if (bytes.Length == 0)
-            {
-                _log.LogDebug("Skipping empty {Path}", path);
-                return;
-            }
-
-            // v0.2.5+: pre-upload integrity check for .pcapng captures.
-            // The Server's /ingest does a similar check but the client-side
-            // version stops bad files from entering the retry loop at all.
-            // The v0.2.0-v0.2.4 bug where killed USBPcapCMD left 24-byte
-            // SHB-only stubs in SystemTemp would retry forever; this catches
-            // the same shape (and any other obvious corruption) and deletes
-            // locally instead.
-            if (path.EndsWith(".pcapng", StringComparison.OrdinalIgnoreCase)
-                && !IsValidPcapHead(bytes))
-            {
-                _log.LogWarning("Skipping malformed pcap {Path} ({Bytes} bytes) — deleting locally.",
-                    path, bytes.Length);
-                try { File.Delete(path); } catch { }
-                return;
-            }
-
             byte[] gzipped;
             using (var ms = new MemoryStream())
             {
@@ -248,104 +213,46 @@ public sealed class Worker : BackgroundService
                 gzipped = ms.ToArray();
             }
 
-            var fname = Path.GetFileName(path);
-            string source;
-            if (fname.StartsWith("cstech2win_shim_", StringComparison.Ordinal))
-                source = "cstech2win";
-            else if (fname.StartsWith("j2534_shim_", StringComparison.Ordinal))
-                source = "j2534";
-            else if (fname.StartsWith(UsbpcapPrefix, StringComparison.Ordinal))
-                source = "usbpcap";
-            else
-                source = "cstech2win";  // unreachable given IsTargetLog gate
-
-            var ok = await _uploader.UploadAsync(gzipped, source, stop);
+            // v0.4.0: every capture is now a genuine Chipsoft driver log.
+            var ok = await _uploader.UploadAsync(gzipped, "chipsoft", stop);
             if (ok)
             {
                 _log.LogInformation("Uploaded {Path}: {InBytes} → {OutBytes} bytes (gzip)",
                     path, bytes.Length, gzipped.Length);
                 IncrementUploadCount();
-                // Server has it on R2 — drop the local copy so it can never
-                // ship twice. If delete fails (e.g. another process holds an
-                // open handle), fall back to renaming.
+                _pending.TryRemove(path, out _);
+                // File is closed (we held it FileShare.None) — delete is safe.
                 try
                 {
                     File.Delete(path);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    try
-                    {
-                        var dest = path + ".uploaded";
-                        if (File.Exists(dest)) File.Delete(dest);
-                        File.Move(path, dest);
-                    }
-                    catch (Exception ex2)
-                    {
-                        _log.LogDebug(ex2, "Could not remove {Path} after upload", path);
-                    }
+                    _log.LogDebug(ex, "Could not remove {Path} after upload", path);
                 }
             }
             else
             {
                 _log.LogWarning("Upload failed for {Path} after retries — keeping for next pass", path);
-                // Re-enqueue with a fresh deadline so we retry later.
                 _pending[path] = DateTime.UtcNow.AddMinutes(5);
             }
-        }
-        catch (IOException ioex)
-        {
-            // File is likely still locked by the producing shim — try later.
-            _log.LogDebug(ioex, "ProcessOne IO error for {Path}, will retry", path);
-            _pending[path] = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "ProcessOne unexpected error for {Path}", path);
+            _pending.TryRemove(path, out _);
         }
     }
 
     /// <summary>
-    /// Validate a pcap file head: 24-byte global header, classic libpcap LE
-    /// magic, LINKTYPE_USBPCAP = 249. Returns false for anything that wouldn't
-    /// pass the server's `_cheap_format_ok` check, so we avoid posting bytes
-    /// that we know would be rejected 422 anyway.
-    ///
-    /// Cheap: only inspects the first 24 bytes regardless of file size.
+    /// True for the driver's own log files — any <c>*.log</c> in the Chipsoft
+    /// logs dir (named <c>YYYYMMDD_HHMMSS.log</c> by the Boost.Log sink).
+    /// Skips our own <c>.uploaded</c> rename leftovers from older versions.
     /// </summary>
-    private static bool IsValidPcapHead(byte[] bytes)
-    {
-        if (bytes.Length < 24) return false;
-        uint magic = (uint)(bytes[0] | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24));
-        if (magic != 0xA1B2C3D4u && magic != 0xA1B23C4Du) return false;
-        // network type at offset 20 (LE u32) must be 249 = LINKTYPE_USBPCAP
-        uint network = (uint)(bytes[20] | (bytes[21] << 8) | (bytes[22] << 16) | (bytes[23] << 24));
-        if (network != 249) return false;
-        // Also require at least one record beyond the global header — a file
-        // that's exactly 24 bytes is the SHB-only stub the v0.2.0 supervisor
-        // bug produced; nothing analytically interesting can live in it.
-        return bytes.Length > 24;
-    }
-
     private static bool IsTargetLog(string name)
     {
         if (string.IsNullOrEmpty(name)) return false;
-        // Shim text logs end in .log
-        if (name.EndsWith(".log", StringComparison.OrdinalIgnoreCase))
-        {
-            foreach (var p in LogPrefixes)
-            {
-                if (name.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
-            }
-            return false;
-        }
-        // USBPcap captures end in .pcapng
-        if (name.EndsWith(".pcapng", StringComparison.OrdinalIgnoreCase)
-            && name.StartsWith(UsbpcapPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-        return false;
+        return name.EndsWith(".log", StringComparison.OrdinalIgnoreCase);
     }
 
     private static void IncrementUploadCount()

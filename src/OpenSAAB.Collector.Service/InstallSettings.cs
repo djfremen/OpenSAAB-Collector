@@ -19,17 +19,29 @@ public sealed class InstallSettings
     public string ConsentVersion { get; set; } = string.Empty;
     public string? VehicleYear { get; set; }
     public string? VehicleModel { get; set; }
-    public string CollectorVersion => "0.3.0";
+    public string CollectorVersion => "0.4.0";
 
     /// <summary>
-    /// Canonical capture directory shared by Worker (watch) + UsbPcapSupervisor
-    /// (write). Pinned to ProgramData with explicit Everyone:RWX ACL set by
-    /// the installer, NOT %TEMP% — the per-service SystemTemp ACL Windows 10+
-    /// applies to LocalSystem services breaks the FileSystemWatcher init,
-    /// silently killing the auto-upload pipeline (v0.2.x bug discovered
-    /// 2026-05-18 via Worker LogInformation absence in event log).
+    /// v0.4.0: the shim concept is retired. Instead of replacing the Chipsoft
+    /// DLLs with logging shims, the Collector switches on the genuine driver's
+    /// OWN Boost.Log sink by setting <c>LogLevel: 0</c> in
+    /// <see cref="ChipsoftOptionsJson"/>. The driver then writes timestamped
+    /// <c>*.log</c> files into <see cref="ChipsoftLogsDir"/> itself — nothing
+    /// to install into the Chipsoft folder, nothing to back up or restore.
+    ///
+    /// Paths are the ones reverse-engineered from j2534_interface.dll
+    /// (Chipsoft_RE/notes/2026-05-05-config-answers.md): the driver builds them
+    /// from <c>%ALLUSERSPROFILE%\CHIPSOFT_J2534\</c>.
     /// </summary>
-    public static string CanonicalCaptureDir => @"C:\ProgramData\OpenSAAB\Captures";
+    public static string ChipsoftDataDir => Path.Combine(
+        Environment.GetEnvironmentVariable("ALLUSERSPROFILE") ?? @"C:\ProgramData",
+        "CHIPSOFT_J2534");
+
+    /// <summary>The driver's JSON config — <c>LogLevel</c> lives here.</summary>
+    public static string ChipsoftOptionsJson => Path.Combine(ChipsoftDataDir, "options.json");
+
+    /// <summary>Where the driver's Boost.Log sink writes <c>YYYYMMDD_HHMMSS.log</c>.</summary>
+    public static string ChipsoftLogsDir => Path.Combine(ChipsoftDataDir, "logs");
 
     public static InstallSettings Load()
     {
