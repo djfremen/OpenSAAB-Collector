@@ -19,7 +19,7 @@ internal sealed class ManualUploader
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string DefaultIngest = "https://openSAAB.com/ingest/shim-log";
-    private const string CollectorVersion = "0.4.0";
+    private const string CollectorVersion = "0.4.1";
 
     /// <summary>The Chipsoft driver's Boost.Log output directory.</summary>
     internal static string ChipsoftLogsDir => Path.Combine(

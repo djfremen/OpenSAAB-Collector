@@ -25,7 +25,7 @@ internal sealed class LogConsoleForm : Form
     private readonly RichTextBox _box;
     private readonly Label _statusLabel;
     private readonly System.Windows.Forms.Timer _pollTimer;
-    private readonly FileSystemWatcher _dirWatcher;
+    private FileSystemWatcher? _dirWatcher;
 
     private FileStream? _activeStream;
     private string? _activePath;
@@ -109,17 +109,21 @@ internal sealed class LogConsoleForm : Form
         Controls.Add(toolbar);
         Controls.Add(_statusLabel);
 
-        // Watch the Chipsoft logs dir for new session logs. Ensure it exists
-        // first — FileSystemWatcher's ctor throws on a missing directory.
-        try { Directory.CreateDirectory(ChipsoftLogsDir); } catch { }
-        _dirWatcher = new FileSystemWatcher(ChipsoftLogsDir)
+        // Watch the Chipsoft logs dir for new session logs. The dir is
+        // owned by the OEM driver and may not exist yet — try to attach,
+        // and if it isn't there fall back to the 250 ms poll timer
+        // (which gracefully no-ops when the dir is missing).
+        if (Directory.Exists(ChipsoftLogsDir))
         {
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
-            EnableRaisingEvents = true,
-            IncludeSubdirectories = false,
-        };
-        _dirWatcher.Created += (_, e) => InvokeIfNeeded(MaybeSwitchToFreshest);
-        _dirWatcher.Renamed += (_, e) => InvokeIfNeeded(MaybeSwitchToFreshest);
+            _dirWatcher = new FileSystemWatcher(ChipsoftLogsDir)
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite,
+                EnableRaisingEvents = true,
+                IncludeSubdirectories = false,
+            };
+            _dirWatcher.Created += (_, e) => InvokeIfNeeded(MaybeSwitchToFreshest);
+            _dirWatcher.Renamed += (_, e) => InvokeIfNeeded(MaybeSwitchToFreshest);
+        }
 
         _pollTimer = new System.Windows.Forms.Timer { Interval = 250 };
         _pollTimer.Tick += (_, _) => Poll();
@@ -249,7 +253,7 @@ internal sealed class LogConsoleForm : Form
     {
         _pollTimer.Stop();
         _pollTimer.Dispose();
-        _dirWatcher.Dispose();
+        _dirWatcher?.Dispose();
         _activeStream?.Dispose();
         base.OnFormClosing(e);
     }

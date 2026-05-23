@@ -44,49 +44,17 @@ public sealed class Worker : BackgroundService
 
         var logsDir = InstallSettings.ChipsoftLogsDir;
 
-        try
-        {
-            if (!Directory.Exists(logsDir))
-            {
-                Directory.CreateDirectory(logsDir);
-                _log.LogInformation("Created Chipsoft logs dir: {Dir}", logsDir);
-            }
-        }
-        catch (Exception ex)
-        {
-            _log.LogWarning(ex, "Could not create Chipsoft logs dir {Dir}", logsDir);
-        }
-
         _log.LogInformation(
             "OpenSAAB Collector v{Version} starting. InstallId={InstallId} Watch={Dir} Endpoint={Url}",
             _settings.CollectorVersion, _settings.InstallId, logsDir, _settings.IngestUrl);
 
-        // Pick up logs left behind from before the service started.
-        EnqueueExisting(logsDir);
+        // We do NOT create the logs dir — the Chipsoft driver owns it and
+        // creates it lazily when its Boost.Log sink first writes. Until
+        // then, FlushSettledAsync polls and FileSystemWatcher attach is
+        // re-attempted on each drain tick (it succeeds the first tick
+        // after the driver creates the dir).
 
-        try
-        {
-            _watcher = new FileSystemWatcher(logsDir)
-            {
-                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                EnableRaisingEvents = true,
-                IncludeSubdirectories = false,
-            };
-            _watcher.Created += OnFileEvent;
-            _watcher.Changed += OnFileEvent;
-            _watcher.Renamed += OnRenamed;
-            _log.LogInformation("FileSystemWatcher attached to {Dir}", logsDir);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex,
-                "Failed to attach FileSystemWatcher to {Dir} — auto-upload disabled. " +
-                "Tray manual 'Upload now' button still works as fallback.",
-                logsDir);
-            // Don't return — keep the drain loop alive so manual flushes still work.
-        }
-
-        // Drain loop — every 5s, flush logs that have settled and closed.
+        // Drain loop — every 5s, poll the logs dir + flush settled logs.
         var ticker = new PeriodicTimer(TimeSpan.FromSeconds(5));
         try
         {
@@ -116,6 +84,30 @@ public sealed class Worker : BackgroundService
         }
     }
 
+    private void EnsureWatcherAttached(string dir)
+    {
+        if (_watcher != null) return;
+        try
+        {
+            _watcher = new FileSystemWatcher(dir)
+            {
+                NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                EnableRaisingEvents = true,
+                IncludeSubdirectories = false,
+            };
+            _watcher.Created += OnFileEvent;
+            _watcher.Changed += OnFileEvent;
+            _watcher.Renamed += OnRenamed;
+            _log.LogInformation("FileSystemWatcher attached to {Dir}", dir);
+        }
+        catch (Exception ex)
+        {
+            // Don't spam — log once per attempt then stay silent.
+            _log.LogDebug(ex, "FileSystemWatcher attach to {Dir} failed; staying on poll-only", dir);
+            _watcher = null;
+        }
+    }
+
     private void OnFileEvent(object sender, FileSystemEventArgs e)
     {
         if (!IsTargetLog(e.Name ?? "")) return;
@@ -130,6 +122,16 @@ public sealed class Worker : BackgroundService
 
     private async Task FlushSettledAsync(CancellationToken stop)
     {
+        // Poll the logs dir each tick: refreshes _pending without depending
+        // on FileSystemWatcher and tolerates a missing dir (driver hasn't
+        // run yet). Also (re)attaches the FSW the first tick the dir
+        // exists, so we get instant events for everything after that.
+        if (Directory.Exists(InstallSettings.ChipsoftLogsDir))
+        {
+            EnqueueExisting(InstallSettings.ChipsoftLogsDir);
+            EnsureWatcherAttached(InstallSettings.ChipsoftLogsDir);
+        }
+
         var now = DateTime.UtcNow;
         foreach (var (path, lastSeen) in _pending.ToArray())
         {

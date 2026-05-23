@@ -19,7 +19,7 @@ public sealed class InstallSettings
     public string ConsentVersion { get; set; } = string.Empty;
     public string? VehicleYear { get; set; }
     public string? VehicleModel { get; set; }
-    public string CollectorVersion => "0.4.0";
+    public string CollectorVersion => "0.4.1";
 
     /// <summary>
     /// v0.4.0: the shim concept is retired. Instead of replacing the Chipsoft

@@ -31,19 +31,14 @@ internal static class ChipsoftConfig
     public static void EnsureLogLevelZero(ILogger log)
     {
         var optionsPath = InstallSettings.ChipsoftOptionsJson;
-        var logsDir = InstallSettings.ChipsoftLogsDir;
 
-        // Pre-create the logs dir so the Worker's FileSystemWatcher can attach
-        // even before the driver has run once. The driver creates it too —
-        // this is just a belt-and-braces guard. Non-fatal if it fails.
-        try
-        {
-            Directory.CreateDirectory(logsDir);
-        }
-        catch (Exception ex)
-        {
-            log.LogWarning(ex, "Could not pre-create Chipsoft logs dir {Dir}", logsDir);
-        }
+        // We do NOT pre-create the Chipsoft logs subdirectory — that folder
+        // belongs to the OEM driver and is created lazily by its Boost.Log
+        // sink when logging is enabled. Pre-creating it can mask the
+        // "driver never spun up its logging" diagnostic signal, and may
+        // interfere with the driver's own sink-init path (mkdir + ACL +
+        // sink register). The Worker handles a missing logs dir by polling
+        // until it appears.
 
         try
         {

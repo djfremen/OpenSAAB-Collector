@@ -14,7 +14,7 @@
 ;   - Tray published:     src\OpenSAAB.Collector.Tray\bin\Release\net8.0-windows\win-x64\publish\OpenSAAB.Collector.Tray.exe
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.4.0"
+#define AppVersion     "0.4.1"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"
@@ -76,16 +76,11 @@ Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName:
 ; increment it after each successful upload.
 Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: dword; ValueName: "UploadCount"; ValueData: "0"; Permissions: users-modify; Flags: uninsdeletevalue createvalueifdoesntexist
 
-[Dirs]
-; v0.4.0: pre-create the Chipsoft driver's logs directory with Everyone:RWX
-; so the LocalSystem service's FileSystemWatcher can attach before the
-; driver has run once, and so the driver (running in Tech2Win's user
-; context) can write into it. The driver also creates this dir itself —
-; this is a belt-and-braces guard. NOT removed on uninstall (it belongs
-; to the Chipsoft driver, not to us).
-Name: "{commonappdata}\CHIPSOFT_J2534\logs"; \
-    Permissions: everyone-modify; \
-    Flags: uninsneveruninstall
+; v0.4.1: NO [Dirs] entry for the Chipsoft logs subdirectory. That folder
+; belongs to the OEM driver — it creates it lazily when its Boost.Log
+; sink first writes. Pre-creating it can mask diagnostic signal and may
+; interfere with the driver's own sink-init path. The Service polls and
+; lazily attaches its FileSystemWatcher once the driver creates the dir.
 
 [Run]
 ; --- Pre-install: refuse if Chipsoft isn't there. Done in [Code] PrepareToInstall. ---
