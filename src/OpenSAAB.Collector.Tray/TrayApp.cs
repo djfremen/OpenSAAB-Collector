@@ -28,10 +28,22 @@ internal sealed class TrayApp : ApplicationContext
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string ServiceName = "OpenSAABCollector";
 
-    /// <summary>The Chipsoft driver's Boost.Log output directory.</summary>
+    /// <summary>The Chipsoft driver's Boost.Log output directory.
+    /// Only populated by J2534-side tools (TrionicCANFlasher, pyj2534) that
+    /// load <c>j2534_interface.dll</c>. Tech2Win uses <c>CSTech2Win.dll</c>
+    /// and does NOT write here — its bytes land in the shim log dir.</summary>
     private static string ChipsoftLogsDir => Path.Combine(
         Environment.GetEnvironmentVariable("ALLUSERSPROFILE") ?? @"C:\ProgramData",
         "CHIPSOFT_J2534", "logs");
+
+    /// <summary>The cstech2win shim's pipe-delimited log dir.
+    /// The shim writes one log per Tech2Win run as
+    /// <c>cstech2win_shim_YYYYMMDD-HHMMSS.log</c> in the current user's
+    /// %TEMP%. This is where Tech2Win-driven sessions actually land — the
+    /// CSTech2Win.dll boundary has no Boost.Log sink of its own.</summary>
+    private static string ShimLogsDir =>
+        Environment.GetEnvironmentVariable("TEMP")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp");
 
     private static string AppVersion =>
         typeof(TrayApp).Assembly.GetName().Version?.ToString(3) ?? "?";
@@ -71,12 +83,27 @@ internal sealed class TrayApp : ApplicationContext
 
         _menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
         _menu.Items.Add("Upload pending logs now", null, (_, _) => _ = UploadNowAsync());
-        _menu.Items.Add("Open log folder", null, (_, _) =>
+        _menu.Items.Add("Open Chipsoft driver log folder", null, (_, _) =>
         {
             try
             {
                 Directory.CreateDirectory(ChipsoftLogsDir);
                 Process.Start(new ProcessStartInfo("explorer.exe", ChipsoftLogsDir) { UseShellExecute = true });
+            }
+            catch { /* best effort */ }
+        });
+        _menu.Items.Add("Open shim log folder (Tech2Win)", null, (_, _) =>
+        {
+            try
+            {
+                // /select highlights the newest matching log so the user lands
+                // exactly on the file they just generated, even though %TEMP%
+                // is crowded with other unrelated files.
+                var newest = Directory.GetFiles(ShimLogsDir, "cstech2win_shim_*.log")
+                    .OrderByDescending(File.GetLastWriteTime)
+                    .FirstOrDefault();
+                var args = newest is null ? ShimLogsDir : $"/select,\"{newest}\"";
+                Process.Start(new ProcessStartInfo("explorer.exe", args) { UseShellExecute = true });
             }
             catch { /* best effort */ }
         });
