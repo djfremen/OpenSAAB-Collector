@@ -1,5 +1,15 @@
 # OpenSAAB Collector
 
+## New: contributor capture track
+
+For Mongoose/Windows 8.1 capture assistance, use the separate
+[portable capture guide](portable/README.md). It includes a manual Wireshark
+workflow and a local-only PowerShell helper preview. Real Windows 8.1/Mongoose
+validation is pending. **The legacy installer below is Chipsoft-specific and
+is not the contributor package.**
+
+## Legacy Chipsoft installer
+
 Windows installer that drops two DLL shims into your existing Chipsoft
 J2534 Pro install. While you use Tech2Win or any J2534 client normally,
 the shims log every diagnostic call to `%TEMP%\`. With your opt-in
