@@ -7,6 +7,7 @@ try {
     $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
     $principal=New-Object Security.Principal.WindowsPrincipal($identity)
     if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Open Windows PowerShell as administrator, then run this script again.' }
+    if ((Get-Service OpenSAABCollector -ErrorAction SilentlyContinue).Status -eq 'Running') { throw 'Stop the legacy OpenSAABCollector service before a portable session; its separate uploader may be enabled.' }
     if (Get-Process USBPcapCMD -ErrorAction SilentlyContinue) { throw 'Another USBPcap capture is running. Stop it before starting this one.' }
     if (Get-Process emulator,Tech2Win -ErrorAction SilentlyContinue) { throw 'Close Tech2Win before starting, so initialization is included.' }
     if (-not $UsbPcapPath) {
@@ -19,13 +20,13 @@ try {
     Write-Host 'Captures can contain VIN, adapter serials and security traffic. Keep them private.'
     $adapter=Read-Host 'Adapter model and driver version (do not enter a VIN)'
     if ([string]::IsNullOrWhiteSpace($adapter)) { throw 'Adapter description is required' }
-    $ifaces=@(Get-CaptureInterfaces @(& $UsbPcapPath --extcap-interfaces))
+    $ifaces=@(Get-CaptureInterfaces @(Invoke-CaptureQuery $UsbPcapPath))
     if ($ifaces.Count -eq 0) { throw 'No USBPcap interfaces found. Check driver installation and reboot.' }
     for ($i=0;$i -lt $ifaces.Count;$i++) { Write-Host ('{0}: {1}' -f ($i+1),$ifaces[$i].Label) }
     $pick=Read-Host 'Root hub number (inspect devices next)'
     if ($pick -notmatch '^[0-9]+$' -or [int]$pick -lt 1 -or [int]$pick -gt $ifaces.Count) { throw 'Invalid hub selection' }
     $iface=$ifaces[[int]$pick-1].Value
-    $devices=@(Get-CaptureDevices @(& $UsbPcapPath --extcap-interface $iface --extcap-config))
+    $devices=@(Get-CaptureDevices @(Invoke-CaptureQuery $UsbPcapPath $iface))
     foreach ($device in $devices) { Write-Host ('{0}: {1}' -f $device.Address,$device.Label) }
     $address=Read-Host 'Exact adapter USB address from this list (not VID/PID)'
     if ($address -notmatch '^[0-9]+$') { throw 'Invalid device address' }
@@ -41,14 +42,14 @@ try {
     $manifest=[ordered]@{ version='portable-preview-0.1'; adapter=$adapter; usb_interface=$iface; usb_address=[int]$address; device_label=$selected[0].Label; started_utc=[DateTime]::UtcNow.ToString('o'); os=[Environment]::OSVersion.VersionString; powershell=$PSVersionTable.PSVersion.ToString(); capture_state='starting'; uploaded=$false; diagnostic_success='not inferred' }
     $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $session 'session.json') -Encoding UTF8
     $argsLine=Get-CaptureArguments $iface ([int]$address) $capture
-    $proc=Start-Process -FilePath $UsbPcapPath -ArgumentList $argsLine -PassThru
+    $proc=Start-CaptureConsole $UsbPcapPath $argsLine
     Start-Sleep -Seconds 2
     if ($proc.HasExited) { throw ('USBPcap exited early. Keep the session folder for troubleshooting: '+$session) }
     Write-Host 'Use the USBPcap window to confirm recording has started BEFORE launching Tech2Win.'
     Write-Host 'In this window, enter action notes immediately before each menu action.'
     Write-Host 'Suggested: launch Tech2Win, select Mongoose driver, read VIN, ECM information, read DTC.'
     Write-Host 'Do not clear codes, program modules or request security access for this first capture.'
-    Write-Host 'To finish: press Ctrl+C in the USBPcap window ONLY, then type DONE here.'
+    Write-Host 'To finish: press q in the USBPcap window ONLY, then type DONE here.'
     while ($true) {
         $note=Read-Host 'Action note / DONE'
         if ($note -ceq 'DONE') {

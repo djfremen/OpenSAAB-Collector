@@ -1,10 +1,9 @@
 # Contributor USB captures (Mongoose first)
 
 This is a separate **local-only portable preview** inside OpenSAAB-Collector.
-It leaves the older Chipsoft service/shim installer intact. Do not give that
-installer to a Windows 8.1/Mongoose contributor: it targets .NET 8/Windows 10,
-replaces Chipsoft DLLs, and its current USB path captures a whole hub at a
-96-byte snap length. Those are unsuitable defaults for this task.
+It preserves the legacy Chipsoft service separately. Versions before 0.4 used
+DLL shims; 0.4.1 uses the driver's native logging. That .NET 8 / Windows 10
+installer is not the Windows 8.1/Mongoose contributor package.
 
 The portable helper targets Windows PowerShell 4 syntax/.NET Framework APIs
 available on Windows 8.1. It does not install drivers, modify adapter DLLs,
@@ -45,7 +44,12 @@ We can review it before asking for longer ECM/DTC captures. Security access is a
 separate, optional later capture of their normal authorized workflow; it is not
 needed to get started and should not be triggered merely to collect more data.
 
-## Portable helper (developer preview)
+## Portable helper (developer preview — interactive stop validation pending)
+
+The SSH backend test captured a successful Chipsoft DTC read, but required forced
+capture termination. The console wrapper and local `q` stop path still need an
+interactive Windows desktop test. Use the manual workflow above for a contributor
+until that test is complete.
 
 Files: `Start-Capture.ps1` and `Capture.Common.ps1` in the same directory.
 Open Windows PowerShell as administrator, review the scripts, and run:
@@ -56,9 +60,10 @@ Open Windows PowerShell as administrator, review the scripts, and run:
 .\Start-Capture.ps1 -UsbPcapPath 'C:\Program Files\USBPcap\USBPcapCMD.exe'
 ```
 
+Stop any legacy Collector service first; it has its own independent uploader.
 The helper lists hubs and devices and asks you to select one explicitly. It
 opens a USBPcap console; confirm recording there, then use the helper window for
-timestamped action notes. Stop with Ctrl+C **in the USBPcap window**, then enter
+timestamped action notes. Stop with **q in the USBPcap window**, then enter
 DONE in the helper. It checks the process exited and validates pcap structure,
 counts truncated packets and records a SHA-256. These checks do not decode or
 prove the diagnostic exchange. Files stay in `Documents\OpenSAAB-Captures`.

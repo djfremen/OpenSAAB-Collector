@@ -24,3 +24,10 @@ Thumbs.db
 # Code-signing artifacts (private cert / pfx)
 *.pfx
 *.snk
+
+# Private diagnostic sessions
+*.pcap
+*.pcapng
+OpenSAAB-Captures/
+session.json
+actions.jsonl

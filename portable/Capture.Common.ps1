@@ -43,3 +43,31 @@ function Get-CaptureSummary([string]$Path) {
         [pscustomobject]@{ Packets=$packets; TruncatedPackets=$truncated; Bytes=$f.Length; DiagnosticSuccess='not inferred' }
     } finally { $r.Dispose();$f.Dispose() }
 }
+function Invoke-CaptureQuery([string]$Executable,[string]$Interface='') {
+    if ($Interface -and $Interface -notmatch '^\\\\\.\\USBPcap[0-9]+$') { throw 'Invalid USBPcap interface' }
+    $p=New-Object Diagnostics.Process
+    try {
+        $p.StartInfo.FileName=$Executable
+        $p.StartInfo.Arguments='--extcap-interfaces'
+        if ($Interface) { $p.StartInfo.Arguments='--extcap-interface "'+$Interface+'" --extcap-config' }
+        $p.StartInfo.UseShellExecute=$false
+        $p.StartInfo.RedirectStandardOutput=$true
+        $p.StartInfo.RedirectStandardError=$true
+        $p.StartInfo.CreateNoWindow=$true
+        $null=$p.Start()
+        $out=$p.StandardOutput.ReadToEndAsync();$err=$p.StandardError.ReadToEndAsync()
+        if (-not $p.WaitForExit(10000)) { $p.Kill();$p.WaitForExit();throw 'USBPcap device query timed out' }
+        $output=$out.Result;$errors=$err.Result
+        if ($p.ExitCode -ne 0) { throw ('USBPcap query failed: '+$errors) }
+        $output -split '\r?\n'
+    } finally { $p.Dispose() }
+}
+function Start-CaptureConsole([string]$Executable,[string]$Arguments) {
+    # USBPcap is a GUI-subsystem executable and does not create its own console
+    # when invoked with -d/-o. Give it an isolated console so q can stop it.
+    $program=$Executable.Replace("'","''")
+    $command=$Arguments.Replace("'","''")
+    $script="`$p=Start-Process -FilePath '$program' -ArgumentList '$command' -NoNewWindow -PassThru; `$p.WaitForExit(); exit `$p.ExitCode"
+    $encoded=[Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+    Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoProfile','-EncodedCommand',$encoded) -PassThru
+}

@@ -1,7 +1,7 @@
 # OpenSAAB Collector — Privacy Policy
 
-**Version:** v1
-**Effective:** 2026-05-13
+**Version:** v2
+**Effective:** 2026-05-22
 
 ## TL;DR
 
@@ -17,22 +17,23 @@
 
 ## What the Collector does
 
-Two DLL shims sit between your J2534-compatible diagnostic software
-(Tech2Win, TrionicCANFlasher, etc.) and the genuine Chipsoft adapter
-DLLs. Every diagnostic call passes through us; we forward it verbatim
-to the genuine DLL and write a log line to `%TEMP%\`.
+As of v0.4.0 the Collector does **not** modify or intercept any Chipsoft
+DLL. It switches on the genuine Chipsoft driver's own built-in logging
+by setting `LogLevel: 0` in `C:\ProgramData\CHIPSOFT_J2534\options.json`.
+The genuine driver then writes a timestamped log of every diagnostic
+session into `C:\ProgramData\CHIPSOFT_J2534\logs\`.
 
-A Windows Service (`OpenSAABCollector`) watches `%TEMP%\` for these
-logs. When a diagnostic session ends and the log file rotates, the
+A Windows Service (`OpenSAABCollector`) watches that folder. When a
+diagnostic session ends and the driver releases its log file, the
 service:
 
-1. Reads the rotated log.
+1. Reads the completed log.
 2. Gzips it in memory.
 3. If `UploadEnabled` is set in the registry: HTTP POSTs to
    `https://openSAAB.com/ingest/shim-log` with these headers:
    - `X-Install-ID`: your random per-install GUID
-   - `X-Capture-Source`: `cstech2win` or `j2534`
-   - `X-Consent-Version`: `v1`
+   - `X-Capture-Source`: `chipsoft`
+   - `X-Consent-Version`: `v2`
    - `X-Vehicle-Year` / `X-Vehicle-Model`: optional, only if you
      entered them
    - `X-Collector-Version`: the build of this Collector
@@ -42,7 +43,7 @@ log file stays on your computer and is yours to keep, share, or delete.
 
 ## What's in a captured log
 
-A shim log records every diagnostic API call your software made:
+A driver log records every diagnostic API call your software made:
 
 - The CAN-ID (which ECU is being addressed)
 - The UDS service ID (`$1A` ReadDataByIdentifier, `$27` SecurityAccess,
@@ -88,7 +89,10 @@ If you opted in:
 - **Pause uploads anytime** via the tray icon. The service keeps
   watching but doesn't send.
 - **Stop and delete the install GUID** by uninstalling the Collector.
-  The genuine Chipsoft DLLs are restored byte-for-byte.
+  Uninstalling removes the service, tray app, and registry tree. It
+  leaves the driver's `LogLevel` setting as-is — to turn the driver's
+  logging back off, set `LogLevel` to `10` (or delete the line) in
+  `C:\ProgramData\CHIPSOFT_J2534\options.json`.
 - **Request deletion of your past uploads** by emailing the maintainer
   with your install GUID. We'll delete everything indexed under that
   GUID.
@@ -99,6 +103,15 @@ GitHub: <https://github.com/djfremen/OpenSAAB-Collector/issues>
 
 ## Changes
 
-We'll bump `Consent Version` (currently `v1`) if the data we collect
+We'll bump `Consent Version` (currently `v2`) if the data we collect
 or how we use it changes materially. Existing installs will keep
-their `v1` consent — we won't auto-promote consent across versions.
+their prior consent version — we won't auto-promote consent across
+versions.
+
+**v1 → v2** (2026-05-22): retired the DLL-shim collection model. The
+Collector no longer modifies any Chipsoft DLL; it enables the genuine
+driver's own logging by setting `LogLevel: 0` in `options.json`. The
+data captured is unchanged — same wire bytes, same VIN exposure, same
+SecurityAccess seed/key — but the collection mechanism is now strictly
+less invasive. `X-Capture-Source` is now `chipsoft` instead of
+`cstech2win` / `j2534`.
