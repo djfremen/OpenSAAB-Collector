@@ -29,3 +29,14 @@
   checksum and Authenticode checks were tested separately; a clean driver
   installation/reboot on Windows 8.1 remains pending.
 - Windows 8.1 + Mongoose validation remains pending; current tests use Chipsoft.
+
+## Published preview
+
+PR #2 merged into main (`9de8bdb`). The public release is
+<https://github.com/djfremen/OpenSAAB-Collector/releases/tag/v0.5.0-preview.1>.
+Anonymous download was verified against the tested EliteBook executable:
+`6c4bd3ac120f9d11a4082d63554535f7995d9d5eae3ebda8393d87478fa94e11`.
+GitHub Actions passed both the Windows build and server tests. No raw bench
+captures or stored credential values were committed or included in release assets.
+The desktop walkthrough upload contained 474 packets, 177 bulk payload packets,
+and a 3,729-byte bundle. A verified receipt was displayed and saved locally.
