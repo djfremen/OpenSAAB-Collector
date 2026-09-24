@@ -63,3 +63,24 @@ The pre-existing Collector service had automatic uploading enabled. It was
 stopped for these tests and remains stopped to avoid uploading new diagnostic
 logs without review; its startup configuration and upload setting were not
 changed. No test capture was uploaded by this workflow.
+
+
+## Interactive EliteBook follow-up
+
+A desktop session exercised the helper through adapter description, hub selection,
+exact device selection, consent, timestamped action notes, premature DONE rejection,
+and finalization. A fresh read-only J2534 probe returned six DTC records with clean
+cleanup. The saved capture contained 456 packets / 22,542 bytes, zero truncation,
+and SHA-256 `f14756182eca6d7ac70d6de06a658815fa449c3531adc3857b3250b5087598c8`.
+The session manifest and action notes were written; nothing was uploaded.
+
+Closing the capture console allowed finalization, but returned interrupted-process
+status -1073741510. It is **not** proof of graceful stop. Separate descriptor-only
+smoke tests using the normal `q` key did not stop the process through the remote
+Windows desktop. Alternate console-launch experiments did not resolve it and were
+not published as fixes. The existing console wrapper may also mask a missing
+child exit code as zero; that requires correction alongside stop handling before
+recommending the helper. Manual Wireshark capture remains the contributor path.
+
+This follow-up does not qualify the Tech2Win GUI sequence, Mongoose, Windows 8.1,
+or any diagnostic operation beyond the stated Chipsoft bench DTC read.
