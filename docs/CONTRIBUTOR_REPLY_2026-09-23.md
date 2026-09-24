@@ -1,12 +1,30 @@
-Thanks for offering to help. You can keep Windows 8.1 if Tech2Win and your Mongoose driver already work there; there is no need to upgrade just to record the USB traffic. For that OS, Wireshark 4.0.17 is the last compatible Wireshark release, used with USBPcap.
+Thanks for offering to help. We now have a simple OpenSAAB Collector preview:
 
-Let's start small: begin a capture of the Mongoose USB device before opening Tech2Win, launch Tech2Win, select your usual Mongoose driver, then read the VIN. If that looks good, continue to ECM information and read the DTCs. Please note the menu path and approximate times, your exact Mongoose model/driver version, and the car's year/model/engine. No need to clear codes or request security access for this first recording.
+https://github.com/djfremen/OpenSAAB-Collector/releases/tag/v0.5.0-preview.1
 
-Stop and save the capture locally. Please don't attach the raw file publicly because it can contain your VIN and other private data; we'll arrange a private transfer. A short startup/VIN sample first will let us confirm we're recording the right device before asking you to do more.
+Download OpenSAAB-Collector.exe and run it as administrator. If USBPcap is missing,
+click Set up USBPcap, complete its installer and restart Windows. You do not need
+Wireshark. Keep your existing Mongoose driver and working Tech2Win installation.
 
-I'm adapting OpenSAAB-Collector for this, with a separate capture-only workflow that leaves your existing driver alone. One correction to my earlier wording: the trace gives us valuable evidence to build and test against, but I can't promise a single file contains everything required for a working Android driver.
+Select your adapter in Collector, accept the private upload notice, and click
+Start capture before opening Tech2Win. Then launch Tech2Win, select your Mongoose
+adapter and read the VIN. Add step notes if possible. Click Stop & upload when
+finished; Collector sends the capture privately to OpenSAAB and confirms receipt.
+It keeps a local copy and offers Retry saved upload if the connection fails.
 
-Capture guide: https://github.com/djfremen/OpenSAAB-Collector/blob/main/portable/README.md
+Let's start with initialization and VIN. Once we verify that recording, we can
+collect ECM information and DTC reads. No need to clear codes, program anything
+or request security access for the first sample.
 
-Reference: https://www.wireshark.org/docs/relnotes/wireshark-4.0.17.html
-USBPcap: https://desowin.org/usbpcap/
+This is tested on Windows 10 with Chipsoft. It is built using APIs available on
+Windows 8.1, but your Windows 8.1/Mongoose combination is still untested. There is
+no need to upgrade your working diagnostic computer just for this first trial.
+If Collector cannot run there, we can use the manual Wireshark 4.0.17 workflow.
+The Collector executable is currently unsigned.
+
+Please don't attach raw captures publicly: they can contain your VIN and other
+private information. A recording helps us build and test adapter support; one
+file cannot guarantee a complete Android driver.
+
+Instructions: https://github.com/djfremen/OpenSAAB-Collector/blob/main/desktop/README.md
+Privacy: https://github.com/djfremen/OpenSAAB-Collector/blob/main/docs/CAPTURE_PRIVACY.md

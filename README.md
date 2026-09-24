@@ -1,40 +1,45 @@
 # OpenSAAB Collector
 
-Local USB capture tools to help document diagnostic adapters for OpenSAAB.
+A simple Windows tool: **set up USBPcap → capture your adapter → stop and upload
+privately to OpenSAAB.** No shims, driver DLL changes or background service.
+Wireshark is not required.
 
-## Start here: contributor captures
+## Capture and upload
 
-Use the [portable capture guide](portable/README.md) for the manual Wireshark
-workflow and a local-only PowerShell helper preview. Start recording before
-Tech2Win, then capture adapter initialization, VIN, ECM information and DTC reads.
-Keep captures private until reviewed; they can contain VINs and device serials.
+See the **[desktop app guide](desktop/README.md)** and
+[release downloads](https://github.com/djfremen/OpenSAAB-Collector/releases).
+Use your existing adapter driver and Tech2Win installation. Start with a short
+initialization/VIN recording, then ECM information and DTC reads. Select only
+your adapter and keep it connected throughout the session.
 
-The helper selects one USB device, keeps full packets, records action timestamps
-and validates the saved capture. It does not replace adapter drivers, install a
-service, send diagnostic commands or upload files.
+After you accept the capture/upload notice and click **Stop & upload**, Collector
+validates the recording, sends it to private Cloudflare R2 storage and saves a
+verified receipt. Your local copy is retained. Use **Retry saved upload** if the
+connection fails. No Cloudflare passwords or storage keys are in the app.
 
-**Status:** developer preview. Fifteen fixture checks pass on EliteBook with
-Windows 10 / Windows PowerShell 5.1. A Chipsoft bench DTC read produced a device-scoped capture. The full interactive
-helper stop flow and Windows 8.1/Mongoose validation remain pending. Use the
-manual Wireshark workflow for contributors until that walkthrough is complete.
+**Validation:** Windows 10 / Chipsoft Pro capture and private R2 round-trip tested.
+Windows 8.1 / Mongoose remains to be tested. See the
+[current checkpoint](docs/AUTOMATED_COLLECTOR_2026-09-23.md) for deployment and UI
+walkthrough status. The first public 0.5 build is a preview.
 
-- [Capture instructions](portable/README.md)
-- [Contributor reply](docs/CONTRIBUTOR_REPLY_2026-09-23.md)
-- [Validation checkpoint](docs/CAPTURE_TRACK_2026-09-23.md)
+- [Contributor instructions](desktop/README.md)
+- [Capture privacy notice](docs/CAPTURE_PRIVACY.md)
+- [Server deployment](server/README.md)
+- [Manual Wireshark fallback](portable/README.md)
 
-## Existing Chipsoft work
+## Development and history
 
-The 0.4.1 service/tray implementation is preserved in `src/` and `installer/`.
-It uses Chipsoft's native driver logging; it retired the earlier DLL shims.
-It targets Windows 10 and .NET 8 and is not the Mongoose contributor package.
-See [legacy implementation documentation](docs/LEGACY_CHIPSOFT.md).
-Historical installers are retained for maintainers, not recommended downloads.
+`desktop/` builds with the installed Windows .NET Framework compiler.
+`server/` contains the upload route and its tests. Adapter-specific decoding stays
+separate from capture; a packet count alone does not prove successful diagnostics.
+Raw captures and credentials must never be committed.
 
-## Development
+The previous Chipsoft native-log service is preserved in `src/` and `installer/`
+for historical reference. It is not part of the new app. Versions before 0.4 used
+DLL shims; 0.4.1 retired those. Historical installers are maintainer-only drafts.
+The earlier local-only PowerShell helper remains in `portable/` as a preview;
+its console stop problem is superseded by the new desktop capture engine.
 
-Run `tests/portable.Tests.ps1` in PowerShell. Raw captures, local session files
-and credentials must never be committed. Keep adapter-specific decoding separate
-from the capture layer and verify request/response traffic before claiming success.
-
-License: [Apache 2.0](LICENSE). USBPcap, Wireshark and OEM drivers are separate
-projects with their own licenses and are not bundled in the portable package.
+License: [Apache 2.0](LICENSE). USBPcap and OEM drivers are separate projects
+with their own licenses. Collector downloads USBPcap from its official release;
+it does not bundle or modify the vendor driver.

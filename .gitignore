@@ -31,3 +31,15 @@ Thumbs.db
 OpenSAAB-Captures/
 session.json
 actions.jsonl
+
+# Local credentials, diagnostics and generated packages
+.env
+.env.*
+!*.example
+*.pem
+*.key
+environment.json
+__pycache__/
+.pytest_cache/
+*.pyc
+*.zip

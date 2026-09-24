@@ -1,3 +1,5 @@
+> Legacy service policy. For the new 0.5 capture app, see [Capture privacy](CAPTURE_PRIVACY.md).
+
 # OpenSAAB Collector — Privacy Policy
 
 **Version:** v2
