@@ -1,6 +1,6 @@
 using System;using System.IO;using System.Net;using System.Net.Http;using System.Diagnostics;using System.Drawing;using System.Windows.Forms;using System.Threading.Tasks;using System.Text;using System.Text.RegularExpressions;using System.Collections.Generic;using System.Web.Script.Serialization;using System.Security.Cryptography;using System.IO.Compression;
-[assembly:System.Reflection.AssemblyVersion("0.5.0.0")]
-[assembly:System.Reflection.AssemblyFileVersion("0.5.0.0")]
+[assembly:System.Reflection.AssemblyVersion("0.5.1.0")]
+[assembly:System.Reflection.AssemblyFileVersion("0.5.1.0")]
 [assembly:System.Reflection.AssemblyProduct("OpenSAAB Collector")]
 [assembly:System.Reflection.AssemblyDescription("Private USB adapter capture and upload")]
 namespace OpenSaab.Collector {
@@ -15,7 +15,7 @@ namespace OpenSaab.Collector {
   public override string ToString(){return Hub.Replace(@"\\.\","")+" — "+Label;}
  }
  public static class Bundle {
-  public const string Version="0.5.0";
+  public const string Version="0.5.1";
   public const string Consent="collector-capture-v1";
   public const string Endpoint="https://www.opensaab.com/api/collector/captures";
   public static string Hash(string path){using(var f=File.OpenRead(path))using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(f)).Replace("-","").ToLowerInvariant();}
@@ -44,8 +44,13 @@ namespace OpenSaab.Collector {
   ComboBox devices=new ComboBox();TextBox adapter=new TextBox(),note=new TextBox();CheckBox consent=new CheckBox();Button setup=new Button(),refresh=new Button(),start=new Button(),stop=new Button(),add=new Button(),retry=new Button(),folder=new Button();Label status=new Label();
   string usb,session;Process worker;Dictionary<string,object> manifest;bool busy,finishing;int notes;DateTime captureStarted;Timer timer=new Timer();
   public CollectorForm(){
-   Text="OpenSAAB Collector";ClientSize=new Size(690,570);MinimumSize=new Size(706,609);Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(246,248,251);
-   AddLabel("OpenSAAB Collector",24,18,640,36,21,true);AddLabel("Record your adapter. Help bring more devices to OpenSAAB.",24,58,640,27,10,false);
+   Text="OpenSAAB Collector";ClientSize=new Size(690,626);MinimumSize=new Size(706,665);Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(246,248,251);
+   using(var stream=typeof(CollectorForm).Assembly.GetManifestResourceStream("OpenSAAB.logo.png"))using(var source=Image.FromStream(stream)){
+    var logo=new PictureBox{Image=new Bitmap(source),SizeMode=PictureBoxSizeMode.Zoom,AccessibleName="OpenSAAB logo"};logo.SetBounds(24,18,64,64);Controls.Add(logo);
+   }
+   using(var stream=typeof(CollectorForm).Assembly.GetManifestResourceStream("OpenSAAB.icon.ico")){Icon=new Icon(stream);}
+   AddLabel("OpenSAAB Collector",100,18,564,36,21,true);AddLabel("Record your adapter. Help bring more devices to OpenSAAB.",100,58,564,27,10,false);
+   var donate=new Button();Btn(donate,"Donate · Support OpenSAAB",24,574,640,40,delegate{ShowSupport();});donate.Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom;
    AddLabel("1   Choose your USB adapter",24,100,640,27,12,true);
    devices.SetBounds(24,134,500,30);devices.DropDownStyle=ComboBoxStyle.DropDownList;Controls.Add(devices);Btn(refresh,"Refresh",536,132,128,32,async delegate{await RefreshDevices();});
    adapter.SetBounds(24,177,640,27);adapter.MaxLength=240;Controls.Add(adapter);AddLabel("Adapter model / driver version / car model and year (optional)",24,208,640,24,9,false);
@@ -59,6 +64,12 @@ namespace OpenSaab.Collector {
    AddLabel("Private uploads • Local copy retained • No driver shims",245,528,435,24,9,false);
    timer.Interval=500;timer.Tick+=async delegate{if(worker!=null && !busy && !finishing){if(worker.HasExited)await Finish();else status.Text="Recording — launch Tech2Win, select your adapter, then read VIN / ECM information / DTCs.\nElapsed: "+(DateTime.UtcNow-captureStarted).ToString(@"mm\:ss")+" (15-minute / 60 MiB limit)";}};timer.Start();
    Shown+=async delegate{await RefreshDevices();};FormClosing+=delegate(object sender,FormClosingEventArgs e){if(worker!=null || busy){e.Cancel=true;MessageBox.Show("Finish the capture or current upload before closing. Local files will be retained.",Text);}};
+  }
+  void ShowSupport(){
+   if(worker!=null || busy){MessageBox.Show("Finish the capture or upload before opening project support.","Support OpenSAAB");return;}
+   if(MessageBox.Show("Support is voluntary and does not unlock features. Contributions help fund adapter testing and documentation.\n\nOpen the OpenSAAB Ko-fi page in your browser? No capture or vehicle data is added to the link.","Support OpenSAAB",MessageBoxButtons.OKCancel,MessageBoxIcon.Information)==DialogResult.OK){
+    try{Process.Start(new ProcessStartInfo("https://ko-fi.com/djfremen"){UseShellExecute=true});}catch(Exception){MessageBox.Show("No browser is available to open the donation page.","Support OpenSAAB");}
+   }
   }
   string BaseDir(){string p=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"OpenSAAB-Captures");Directory.CreateDirectory(p);return p;}
   void AddLabel(string text,int x,int y,int w,int h,int size,bool bold){var l=new Label{Text=text,Font=new Font("Segoe UI",size,bold?FontStyle.Bold:FontStyle.Regular)};l.SetBounds(x,y,w,h);Controls.Add(l);}
