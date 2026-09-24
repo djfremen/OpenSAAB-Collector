@@ -1,27 +1,32 @@
 # Architecture
 
+> **v0.4.0** — the DLL-shim model is retired. The Collector switches on the
+> genuine Chipsoft driver's own logging instead of intercepting its DLLs.
+
 ```
                     ┌──────────────────────────────────────────────┐
                     │            EliteBook (Windows 10)            │
                     │                                              │
-   Tech2Win  ──┐    │  C:\Program Files (x86)\CHIPSOFT_J2534_…\    │
-               ├──► │   CSTech2Win.dll  (← OpenSAAB shim)          │
-               │    │   CSTech2Win_real.dll  (← genuine)           │
+   Tech2Win  ──┐    │   genuine Chipsoft J2534 Pro driver          │
+   J2534      ─┤──► │   (CSTech2Win.dll / j2534_interface.dll —    │
+   clients     │    │    UNMODIFIED)                               │
                │    │                                              │
-               └──► │  every D-PDU call logged to                  │
-                    │   %TEMP%\cstech2win_shim_<ts>.log            │
-                    │                                              │
-   TrionicCAN─┐     │   j2534_interface.dll  (← OpenSAAB shim)     │
-   Flasher    ├──►  │   j2534_interface_real.dll  (← genuine)      │
-   etc.       │     │                                              │
-              └──►  │  every PassThru* call logged to              │
-                    │   %TEMP%\j2534_shim_<ts>.log                 │
+               │    │   reads C:\ProgramData\CHIPSOFT_J2534\       │
+               │    │          options.json   →  LogLevel: 0       │
+               │    │                                              │
+               └──► │   Boost.Log sink writes each session to      │
+                    │   C:\ProgramData\CHIPSOFT_J2534\logs\        │
+                    │          <YYYYMMDD>_<HHMMSS>.log             │
                     │                                              │
                     │  ┌─────────────────────────────────────────┐ │
                     │  │   OpenSAABCollector  (Windows Service)  │ │
                     │  │                                         │ │
-                    │  │  FileSystemWatcher → settle 30s         │ │
-                    │  │     → gzip → POST /ingest/shim-log      │ │
+                    │  │  on start: ChipsoftConfig ensures       │ │
+                    │  │            options.json LogLevel = 0    │ │
+                    │  │                                         │ │
+                    │  │  FileSystemWatcher on …\logs\           │ │
+                    │  │   → settle 30s + exclusive-open check   │ │
+                    │  │   → gzip → POST /ingest/shim-log        │ │
                     │  │                                         │ │
                     │  │  reads HKLM\SOFTWARE\OpenSAAB\Collector │ │
                     │  │  for InstallId / UploadEnabled / etc    │ │
@@ -38,83 +43,77 @@
                     │                                              │
                     │   POST /ingest/shim-log                      │
                     │     → uploads/<install-id>/                  │
-                    │         <source>_<wall_ms>.log.gz            │
-                    │         <source>_<wall_ms>.meta.json         │
-                    │                                              │
-                    │   GET /api/health  → community_captures: N   │
-                    │   GET /            → landing page (live N)   │
+                    │         chipsoft_<wall_ms>.log.gz            │
+                    │         chipsoft_<wall_ms>.meta.json         │
                     └──────────────────────────────────────────────┘
                                   │
                                   ▼
                     ┌──────────────────────────────────────────────┐
                     │   github.com/djfremen/OpenSAAB               │
                     │     commands/saab/*.yaml  (catalog)          │
-                    │     docs/saab_ecu_address_map_*.md           │
-                    │     tools/decode_gmw3110_dtc.py              │
                     └──────────────────────────────────────────────┘
 ```
 
+## Why the shim went away
+
+The shim model replaced `CSTech2Win.dll` with an interception DLL that
+forwarded calls to a renamed `CSTech2Win_real.dll` and logged each one.
+It worked, but it carried real install friction and fragility:
+
+- A DLL swap inside someone else's program folder, with backup/restore
+  logic that had to survive re-installs, uninstalls, and Tech2Win
+  updates.
+- Restart Manager corner cases when a headless `emulator.exe` kept the
+  shim DLL loaded.
+- A second DLL (`j2534_interface.dll`) that most contributors never
+  exercised.
+
+The Chipsoft driver already has a built-in Boost.Log sink. Static RE of
+`j2534_interface.dll` (see `Chipsoft_RE/notes/2026-05-05-config-answers.md`)
+showed it is gated purely by the `LogLevel` byte in `options.json`:
+`0..4` create the sink, `≥5` (the shipped default of `10`) create
+nothing. So `LogLevel: 0` turns on full trace logging with **zero**
+files installed into the Chipsoft folder.
+
 ## Component responsibilities
 
-### Shim DLLs (Chipsoft_RE repo)
+### `ChipsoftConfig` (Service)
 
-Native C, x86. They have to be DLLs because they intercept calls to
-`CSTech2Win.dll` and `j2534_interface.dll`. Each call is forwarded to
-the genuine renamed DLL (`*_real.dll`) and a log line is written to
-`%TEMP%\<shim-name>_<timestamp>.log`.
-
-The CSTech2Win shim is at
-[`Chipsoft_RE/shim/cstech2win/`](https://github.com/djfremen/Chipsoft_RE/tree/main/shim/cstech2win).
-The j2534 shim is at
-[`Chipsoft_RE/shim/j2534/`](https://github.com/djfremen/Chipsoft_RE/tree/main/shim/j2534).
+On every service start, ensures `C:\ProgramData\CHIPSOFT_J2534\options.json`
+has `LogLevel: 0`. Patches only that key — any Lite/Mid/Pro tier objects
+and their `OpenPort2Mode` / `RemapAUXToPIN` / `SplitReadTimeout` settings
+are preserved. If `options.json` doesn't exist, writes a minimal
+`{ "LogLevel": 0 }` and lets the driver default everything else.
 
 ### Collector Service (this repo)
 
 .NET 8 Windows Service. `BackgroundService` with a `FileSystemWatcher`
-on `%TEMP%`. Settle window is 30 seconds — once a shim log hasn't
-been touched for that long, we treat it as ready to upload.
+on the Chipsoft logs dir. Settle window is 30 seconds.
 
-Why 30 seconds? Tech2Win sometimes pauses for several seconds between
-diagnostic operations within one menu (e.g. the engine ECM responsePending
-delay observed at ~1.5s). 30s is large enough that we don't upload
-mid-flow but small enough that the user doesn't have to wait minutes
-to see their upload land.
+"Ready to upload" needs two signals: (1) the log has been untouched for
+30 s, AND (2) it can be opened with `FileShare.None`. The Chipsoft
+driver holds its **active** session log open for the whole session, so
+an exclusive open fails until the session ends and the driver unloads.
+This makes a partial / in-progress upload impossible — strictly better
+than the old rotation heuristic.
 
 ### Tray app (this repo)
 
-WinForms tray icon. Three functions:
-- **Toggle Upload Enabled**: writes `HKLM\SOFTWARE\OpenSAAB\Collector\UploadEnabled`
-- **Open log folder**: opens `%TEMP%`
-- **Show install GUID**: read-only display for support contact
-
-Service polls registry on the next iteration, so changes take effect
-within ~5s.
+WinForms tray icon: toggle Upload Enabled, live console (raw tail of the
+freshest driver log), "Upload pending logs now", open log folder, show
+install GUID, captures counter.
 
 ### Server (saab-security-api repo)
 
-FastAPI on Koyeb. One route added for ingestion:
-
-```python
-@app.post("/ingest/shim-log")
-```
-
-50 MB cap per upload, gzip required, validated headers, persists to
-disk under `uploads/<install-id>/`. Sidecar JSON written next to each
-log with full metadata.
+FastAPI on Koyeb. `POST /ingest/shim-log` — gzip required, validated
+headers, persisted to `uploads/<install-id>/`. The uploaded files are
+genuine Chipsoft driver logs (`X-Capture-Source: chipsoft`); the driver's
+log lines are obfuscated, decoded with
+`Chipsoft_RE/tools/decode_chipsoft_log.py`.
 
 ## Why a Service + Tray instead of one tray app
 
-The Service runs as `LocalSystem` so it can write to `HKLM` keys and
-read all of `%TEMP%` (which the user-mode tray app might not have full
-access to depending on how `%TEMP%` was permissioned). The tray app
-runs in the user's session for UI affordances.
-
-This split also means closing the tray icon doesn't stop uploads —
-the user has to actively toggle the registry flag or uninstall.
-
-## Sync between concurrent shim logs
-
-Both shims write a `wall_clock_ms` column on every log line (FILETIME
-since Unix epoch / 10000). Same source on both — directly comparable.
-A future merge tool can `cat cstech2win_shim_*.log j2534_shim_*.log
-| sort -t '|' -k 2 -n` to get a unified timeline across both APIs.
+The Service runs as `LocalSystem` so it can write `options.json` under
+`C:\ProgramData`, write `HKLM` keys, and watch the logs dir regardless
+of the calling user. The tray app runs in the user's session for UI.
+Closing the tray icon doesn't stop uploads — the service keeps running.

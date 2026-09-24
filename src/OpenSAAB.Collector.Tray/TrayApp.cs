@@ -7,22 +7,43 @@ namespace OpenSAAB.Collector.Tray;
 /// Tray-icon app for the OpenSAAB Collector.
 ///
 /// Menu:
+///   - Header: "OpenSAAB Collector vN"
 ///   - Header: "Captures uploaded: N" (read-only)
 ///   - Toggle "Upload enabled"
-///   - "Open live console" (raw color-coded tail)
+///   - "Open live console" (raw tail of the Chipsoft driver log)
 ///   - "Upload pending logs now" (bypasses the 30 s settle in the service)
 ///   - "Open log folder"
 ///   - "Show install GUID"
 ///   - "About"
 ///   - "Exit (service keeps running)"
 ///
-/// Decoded console / scapy decoder removed in v0.1.4 — decoding happens
-/// server-side on the uploaded logs. The mission is reliable capture + ship.
+/// v0.4.0: the DLL-shim model is retired. The Collector switches on the
+/// genuine Chipsoft driver's own logging (LogLevel 0 in options.json) and
+/// harvests the driver's log files — no shim, no USBPcap. USB capture
+/// controls were removed; USBPcap survives only as a manual fallback,
+/// documented in docs/usbpcap-fallback.md.
 /// </summary>
 internal sealed class TrayApp : ApplicationContext
 {
     private const string KeyPath = @"SOFTWARE\OpenSAAB\Collector";
     private const string ServiceName = "OpenSAABCollector";
+
+    /// <summary>The Chipsoft driver's Boost.Log output directory.
+    /// Only populated by J2534-side tools (TrionicCANFlasher, pyj2534) that
+    /// load <c>j2534_interface.dll</c>. Tech2Win uses <c>CSTech2Win.dll</c>
+    /// and does NOT write here — its bytes land in the shim log dir.</summary>
+    private static string ChipsoftLogsDir => Path.Combine(
+        Environment.GetEnvironmentVariable("ALLUSERSPROFILE") ?? @"C:\ProgramData",
+        "CHIPSOFT_J2534", "logs");
+
+    /// <summary>The cstech2win shim's pipe-delimited log dir.
+    /// The shim writes one log per Tech2Win run as
+    /// <c>cstech2win_shim_YYYYMMDD-HHMMSS.log</c> in the current user's
+    /// %TEMP%. This is where Tech2Win-driven sessions actually land — the
+    /// CSTech2Win.dll boundary has no Boost.Log sink of its own.</summary>
+    private static string ShimLogsDir =>
+        Environment.GetEnvironmentVariable("TEMP")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp");
 
     private static string AppVersion =>
         typeof(TrayApp).Assembly.GetName().Version?.ToString(3) ?? "?";
@@ -31,15 +52,13 @@ internal sealed class TrayApp : ApplicationContext
     private readonly ToolStripMenuItem _versionHeader;
     private readonly ToolStripMenuItem _countHeader;
     private readonly ToolStripMenuItem _toggleUpload;
-    private readonly ToolStripMenuItem _startUsbCapture;
-    private readonly ToolStripMenuItem _stopUsbCapture;
     private readonly ContextMenuStrip _menu;
     private LogConsoleForm? _consoleForm;
 
     public TrayApp()
     {
         _menu = new ContextMenuStrip();
-        _menu.Opening += (_, _) => { RefreshCountHeader(); RefreshUsbCaptureItems(); };
+        _menu.Opening += (_, _) => RefreshCountHeader();
 
         _versionHeader = new ToolStripMenuItem($"OpenSAAB Collector  v{AppVersion}")
         {
@@ -62,28 +81,31 @@ internal sealed class TrayApp : ApplicationContext
         _menu.Items.Add(_toggleUpload);
         _menu.Items.Add(new ToolStripSeparator());
 
-        // USB capture controls (v0.2.0) — write to Registry; the service's
-        // UsbPcapSupervisor polls and spawns/kills USBPcapCMD.exe.
-        _startUsbCapture = new ToolStripMenuItem("🟢 Start USB capture", null, (_, _) => SetUsbCapture(true));
-        _stopUsbCapture = new ToolStripMenuItem("🔴 Stop USB capture",  null, (_, _) => SetUsbCapture(false));
-        RefreshUsbCaptureItems();
-        _menu.Items.Add(_startUsbCapture);
-        _menu.Items.Add(_stopUsbCapture);
-        // v0.3.0 — "Auto-capture next Tech2Win launch": tray arms a flag, the
-        // service's UsbPcapSupervisor polls for emulator.exe / Tech2Win.exe
-        // and starts USBPcap automatically when it sees one, then stops 5 s
-        // after the process exits. Closes the "contributors miss the init
-        // 25 s of Tech2Win" gap — Tech2Win's full PDUSetComParam burst is in
-        // the first 25 s of any session, and manual timing usually misses it.
-        _menu.Items.Add("🎯 Auto-capture next Tech2Win launch", null, (_, _) => ArmTech2WinAutoCapture());
-        _menu.Items.Add(new ToolStripSeparator());
-
         _menu.Items.Add("Open live console…", null, (_, _) => OpenLiveConsole());
         _menu.Items.Add("Upload pending logs now", null, (_, _) => _ = UploadNowAsync());
-        _menu.Items.Add("Open log folder", null, (_, _) =>
+        _menu.Items.Add("Open Chipsoft driver log folder", null, (_, _) =>
         {
-            var path = Path.GetTempPath();
-            Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
+            try
+            {
+                Directory.CreateDirectory(ChipsoftLogsDir);
+                Process.Start(new ProcessStartInfo("explorer.exe", ChipsoftLogsDir) { UseShellExecute = true });
+            }
+            catch { /* best effort */ }
+        });
+        _menu.Items.Add("Open shim log folder (Tech2Win)", null, (_, _) =>
+        {
+            try
+            {
+                // /select highlights the newest matching log so the user lands
+                // exactly on the file they just generated, even though %TEMP%
+                // is crowded with other unrelated files.
+                var newest = Directory.GetFiles(ShimLogsDir, "cstech2win_shim_*.log")
+                    .OrderByDescending(File.GetLastWriteTime)
+                    .FirstOrDefault();
+                var args = newest is null ? ShimLogsDir : $"/select,\"{newest}\"";
+                Process.Start(new ProcessStartInfo("explorer.exe", args) { UseShellExecute = true });
+            }
+            catch { /* best effort */ }
         });
         _menu.Items.Add("Show install GUID", null, (_, _) =>
         {
@@ -167,18 +189,16 @@ internal sealed class TrayApp : ApplicationContext
             return;
         }
 
-        var candidates = ManualUploader.FindPendingLogs(Path.GetTempPath());
+        var candidates = ManualUploader.FindPendingLogs();
         if (candidates.Count == 0)
         {
             _icon.ShowBalloonTip(3000, "OpenSAAB Collector",
-                "No pending shim logs found in %TEMP%.",
+                "No pending logs found. Run a Tech2Win session and close it first — " +
+                "the Chipsoft driver writes its log when the session ends.",
                 ToolTipIcon.Info);
             return;
         }
 
-        // Live progress dialog — v0.2.3+. With USBPcap captures landing as
-        // multi-MB .pcapng files the user wants visible reassurance that
-        // upload is making progress; balloon-only was opaque.
         var progress = new UploadProgressForm(candidates.Count);
         progress.Show();
         Application.DoEvents();
@@ -224,289 +244,10 @@ internal sealed class TrayApp : ApplicationContext
         RefreshCountHeader();
         var icon = fail == 0 ? ToolTipIcon.Info : ToolTipIcon.Warning;
         var parts = new List<string> { $"Uploaded {ok} log(s)" };
-        if (skipped > 0) parts.Add($"skipped {skipped} empty");
-        if (fail > 0) parts.Add($"failed {fail}");
+        if (skipped > 0) parts.Add($"skipped {skipped} low-value");
+        if (fail > 0) parts.Add($"failed {fail} (session still open?)");
         var msg = string.Join(", ", parts) + $". Captures total: {ReadUploadCount()}.";
         _icon.ShowBalloonTip(4000, "OpenSAAB Collector", msg, icon);
-    }
-
-    /// <summary>
-    /// Arm auto-capture for the next Tech2Win launch (v0.3.0). Sets
-    /// `Tech2WinAutoCaptureArmed = 1` in HKLM. The service's UsbPcapSupervisor
-    /// polls this; when set AND emulator.exe / Tech2Win.exe enters the
-    /// process list, it auto-starts USBPcap. When the process exits + 5 s
-    /// settle, it auto-stops. Clears the armed flag on either start (so it's
-    /// a one-shot) or explicit user cancel via Stop USB capture.
-    /// </summary>
-    private void ArmTech2WinAutoCapture()
-    {
-        if (!UsbPcapIsInstalled())
-        {
-            MessageBox.Show(
-                "USBPcap doesn't appear to be installed. Auto-capture requires it.\n\n" +
-                "Install from https://desowin.org/usbpcap/",
-                "OpenSAAB Collector — USBPcap missing",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-        try
-        {
-            using var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
-                           ?? Registry.LocalMachine.CreateSubKey(KeyPath);
-            key.SetValue("Tech2WinAutoCaptureArmed", 1, RegistryValueKind.DWord);
-            key.SetValue("UsbCaptureLastFailure", "", RegistryValueKind.String);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Failed to set armed flag: {ex.Message}",
-                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return;
-        }
-        _icon.ShowBalloonTip(6000,
-            "OpenSAAB Collector — Auto-capture armed",
-            "Launch Tech2Win now. USBPcap will start automatically and capture " +
-            "the full session including the channel-open / ComParam burst " +
-            "(the first 25 s usually missed by manual timing). Capture stops " +
-            "5 s after Tech2Win exits.",
-            ToolTipIcon.Info);
-    }
-
-    /// <summary>
-    /// USB-capture state lives in HKLM\SOFTWARE\OpenSAAB\Collector\UsbCaptureRequested.
-    /// Tray writes it (UAC-prompted on first write because HKLM); service polls
-    /// it from UsbPcapSupervisor and spawns / kills USBPcapCMD.exe accordingly.
-    /// </summary>
-    private void SetUsbCapture(bool start)
-    {
-        // On Start: surface "USBPcap not installed" to the user immediately
-        // rather than silently failing service-side and bouncing the flag.
-        if (start && !UsbPcapIsInstalled())
-        {
-            var r = MessageBox.Show(
-                "USBPcap doesn't appear to be installed on this machine.\n\n" +
-                "USB capture needs the USBPcap kernel driver. Install it from\n" +
-                "https://desowin.org/usbpcap/  (free, ~3 MB, one-time reboot required).\n\n" +
-                "Open the download page now?",
-                "OpenSAAB Collector — USBPcap missing",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-            if (r == DialogResult.Yes)
-            {
-                Process.Start(new ProcessStartInfo("https://desowin.org/usbpcap/") { UseShellExecute = true });
-            }
-            return;
-        }
-
-        try
-        {
-            using (var key = Registry.LocalMachine.OpenSubKey(KeyPath, writable: true)
-                           ?? Registry.LocalMachine.CreateSubKey(KeyPath))
-            {
-                // Clear any prior failure marker before requesting; the service
-                // sets it again if the new attempt fails.
-                key.SetValue("UsbCaptureLastFailure", "", RegistryValueKind.String);
-                key.SetValue("UsbCaptureRequested", start ? 1 : 0, RegistryValueKind.DWord);
-            }
-            RefreshUsbCaptureItems();
-
-            if (start)
-            {
-                // Validate: the service polls every 2 s and on healthy spawn
-                // writes UsbCaptureLastFile within ~3 s. Poll Registry for up
-                // to 7 s and surface a precise outcome to the user.
-                _ = Task.Run(() => PollUsbCaptureOutcome(starting: true));
-            }
-            else
-            {
-                // v0.2.7: record when we asked for the stop, then poll the
-                // supervisor for confirmation. Pre-v0.2.7 we showed an
-                // optimistic balloon and trusted the service had killed the
-                // process — but if the supervisor had lost its in-memory
-                // Process reference (service restart since spawn), Stop was
-                // a silent no-op and USBPcapCMD kept running for hours.
-                var requestedAtUtc = DateTime.UtcNow;
-
-                // Pop the captures directory in Explorer so the user can open
-                // the .pcapng in Wireshark for manual validation before upload.
-                string? lastFile = null;
-                try
-                {
-                    using var roKey = Registry.LocalMachine.OpenSubKey(KeyPath);
-                    lastFile = roKey?.GetValue("UsbCaptureLastFile") as string;
-                }
-                catch { }
-
-                try
-                {
-                    if (!string.IsNullOrEmpty(lastFile) && File.Exists(lastFile))
-                    {
-                        Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{lastFile}\"")
-                            { UseShellExecute = true });
-                    }
-                    else
-                    {
-                        Process.Start(new ProcessStartInfo("explorer.exe", Path.GetTempPath())
-                            { UseShellExecute = true });
-                    }
-                }
-                catch { }
-
-                _ = Task.Run(() => PollUsbCaptureStopOutcome(requestedAtUtc));
-            }
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show("Failed to update USB capture state (admin required for HKLM write?):\n\n" + ex.Message,
-                "OpenSAAB Collector", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
-    }
-
-    /// <summary>
-    /// After flipping UsbCaptureRequested=1, watch Registry for the supervisor
-    /// to confirm spawn-and-file-creation, OR to write a failure marker. Updates
-    /// the tray balloon with a precise success or failure message.
-    /// </summary>
-    private void PollUsbCaptureOutcome(bool starting)
-    {
-        // 15 s budget is enough for: 2 s supervisor poll cycle, 1-2 s
-        // `USBPcapCMD --extcap-config` device-list probe, ProcessStartInfo
-        // spawn, plus 3 s file-creation validation. v0.2.1 used 7 s which
-        // raced the device-pick probe and yielded false "status unknown"
-        // balloons even when the capture started fine.
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        string? lastFile = null;
-        string lastFailure = "";
-
-        while (DateTime.UtcNow < deadline)
-        {
-            try
-            {
-                using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
-                lastFile    = key?.GetValue("UsbCaptureLastFile")    as string;
-                lastFailure = key?.GetValue("UsbCaptureLastFailure") as string ?? "";
-            }
-            catch { }
-
-            if (!string.IsNullOrEmpty(lastFailure))
-            {
-                _icon.ShowBalloonTip(7000, "OpenSAAB Collector — USB capture failed",
-                    $"Couldn't start USBPcap. Reason: {lastFailure}\n\n" +
-                    "Check Event Viewer → Application → OpenSAABCollector for details.",
-                    ToolTipIcon.Error);
-                return;
-            }
-            // If the supervisor wrote a file path AND the file actually exists
-            // AND UsbCaptureRequested is still 1 (didn't get bounced), the
-            // capture is healthy.
-            if (!string.IsNullOrEmpty(lastFile) && File.Exists(lastFile))
-            {
-                _icon.ShowBalloonTip(4000, "OpenSAAB Collector",
-                    $"USB capture running.\nFile: {Path.GetFileName(lastFile!)}",
-                    ToolTipIcon.Info);
-                return;
-            }
-            Thread.Sleep(500);
-        }
-
-        _icon.ShowBalloonTip(7000, "OpenSAAB Collector — USB capture status unknown",
-            "The service didn't confirm capture start within 15 s. Check Event Viewer → Application → OpenSAABCollector.",
-            ToolTipIcon.Warning);
-    }
-
-    /// <summary>
-    /// v0.2.7: after flipping UsbCaptureRequested=0, poll for the supervisor
-    /// to either write a fresh UsbCaptureLastStop timestamp (post-request)
-    /// or zero out UsbCapturePid. Either signal confirms a real stop.
-    /// Without this, pre-v0.2.7 showed an optimistic "stopped" balloon even
-    /// when the supervisor had lost its in-memory process reference and
-    /// USBPcapCMD kept running for hours.
-    /// </summary>
-    private void PollUsbCaptureStopOutcome(DateTime requestedAtUtc)
-    {
-        // 10 s budget covers the 2 s supervisor poll cadence + Process.Kill
-        // + WaitForExit(5000). If a stop hasn't confirmed in 10 s, something
-        // is wrong and the user needs to know.
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (DateTime.UtcNow < deadline)
-        {
-            int pid = 0;
-            string lastStop = "";
-            try
-            {
-                using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
-                pid = (key?.GetValue("UsbCapturePid") as int?) ?? 0;
-                lastStop = key?.GetValue("UsbCaptureLastStop") as string ?? "";
-            }
-            catch { }
-
-            // PID cleared → no process recorded as running. Confirmed stop.
-            // LastStop newer than our request → supervisor handled this stop.
-            bool stopAcked = false;
-            if (pid == 0)
-            {
-                stopAcked = true;
-            }
-            else if (!string.IsNullOrEmpty(lastStop)
-                     && DateTime.TryParse(lastStop, null,
-                         System.Globalization.DateTimeStyles.RoundtripKind, out var lsUtc)
-                     && lsUtc >= requestedAtUtc)
-            {
-                stopAcked = true;
-            }
-
-            if (stopAcked)
-            {
-                _icon.ShowBalloonTip(4000, "OpenSAAB Collector",
-                    "USB capture confirmed stopped. The .pcapng will upload after a 30 s settle.",
-                    ToolTipIcon.Info);
-                return;
-            }
-            Thread.Sleep(500);
-        }
-
-        _icon.ShowBalloonTip(8000, "OpenSAAB Collector — Stop didn't confirm",
-            "The supervisor didn't confirm USBPcapCMD exited within 10 s. " +
-            "It may still be running. Check Event Viewer → Application → " +
-            "OpenSAABCollector, or kill USBPcapCMD.exe manually.",
-            ToolTipIcon.Warning);
-    }
-
-    private static bool UsbPcapIsInstalled()
-    {
-        // Same probe order the service uses (PATH + standard install dirs).
-        var pathSearch = Environment.GetEnvironmentVariable("PATH")?.Split(Path.PathSeparator) ?? [];
-        foreach (var dir in pathSearch)
-        {
-            if (File.Exists(Path.Combine(dir, "USBPcapCMD.exe"))) return true;
-        }
-        var pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-        var candidates = new[]
-        {
-            Path.Combine(pf, "USBPcap", "USBPcapCMD.exe"),
-            @"C:\Program Files\USBPcap\USBPcapCMD.exe",
-            @"C:\Program Files (x86)\USBPcap\USBPcapCMD.exe",
-        };
-        foreach (var c in candidates)
-        {
-            if (File.Exists(c)) return true;
-        }
-        return false;
-    }
-
-    private static bool ReadUsbCaptureRequested()
-    {
-        try
-        {
-            using var key = Registry.LocalMachine.OpenSubKey(KeyPath);
-            return (key?.GetValue("UsbCaptureRequested") as int? ?? 0) != 0;
-        }
-        catch { return false; }
-    }
-
-    private void RefreshUsbCaptureItems()
-    {
-        var running = ReadUsbCaptureRequested();
-        _startUsbCapture.Enabled = !running;
-        _stopUsbCapture.Enabled = running;
     }
 
     private static bool ReadUploadEnabled()

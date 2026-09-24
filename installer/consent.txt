@@ -1,16 +1,19 @@
 OpenSAAB Collector — Data Collection Consent
 
-The OpenSAAB Collector installs two interception libraries (DLL shims)
-into your existing Chipsoft J2534 Pro driver folder:
+The OpenSAAB Collector does NOT modify your Chipsoft driver. It does not
+replace, rename, or inject any DLL. Instead it switches on the Chipsoft
+J2534 Pro driver's OWN built-in diagnostic logging by setting
 
-  - CSTech2Win.dll  (intercepts the Chipsoft D-PDU API used by Tech2Win)
-  - j2534_interface.dll  (intercepts the SAE J2534 PassThru API used
-    by TrionicCANFlasher and other J2534 clients)
+  LogLevel: 0   in   C:\ProgramData\CHIPSOFT_J2534\options.json
 
-The genuine Chipsoft DLLs are not deleted — they are renamed to
-CSTech2Win_real.dll and j2534_interface_real.dll. Our shims forward
-every call to the genuine DLLs and write a log of the calls to your
-%TEMP% folder.
+With logging on, the genuine driver writes a timestamped log file for
+each Tech2Win / J2534 session into
+
+  C:\ProgramData\CHIPSOFT_J2534\logs\
+
+A Windows Service (OpenSAABCollector) watches that folder. When a
+session ends and the driver releases its log file, the service reads it,
+compresses it, and — only if you opt in below — uploads it over HTTPS.
 
 WHAT'S IN THE LOGS:
   - The CAN-ID, UDS service IDs, and full byte payloads of every
@@ -31,13 +34,12 @@ WHAT WE DO WITH UPLOADS (if you opt in):
 
 YOUR CHOICE:
   [ ] Yes, I consent to upload captured logs.
-        — Logs upload automatically when Tech2Win / J2534 client closes.
+        — Logs upload automatically when a Tech2Win / J2534 session ends.
         — You can pause uploads anytime via the tray icon.
-        — You can uninstall at any time and the genuine Chipsoft DLLs
-          will be restored byte-for-byte.
 
   [ ] No, install the Collector for local logging only.
-        — Logs still write to %TEMP% (useful for your own debugging).
+        — The driver still writes logs to C:\ProgramData\CHIPSOFT_J2534\logs\
+          (useful for your own debugging).
         — Nothing is sent over the network.
         — You can change your mind later via the tray icon.
 
@@ -47,4 +49,9 @@ By clicking "Next" you confirm:
     security access exchanges.
   - You can revoke consent and uninstall the Collector at any time.
 
-Consent version: v1 (2026-05-13)
+Note: uninstalling the Collector removes the service and tray app but
+leaves the driver's LogLevel setting as-is. To turn the driver's logging
+back off, set LogLevel to 10 (or delete the LogLevel line) in
+C:\ProgramData\CHIPSOFT_J2534\options.json.
+
+Consent version: v2 (2026-05-22)

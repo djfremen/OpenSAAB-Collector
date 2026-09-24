@@ -1,16 +1,20 @@
 ; OpenSAAB Collector — InnoSetup 6 installer script.
 ;
 ; Build: iscc opensaab-collector.iss
-; Output: Output\opensaab-collector-setup-0.1.0.exe
+; Output: Output\opensaab-collector-setup-0.4.0.exe
+;
+; v0.4.0: the DLL-shim model is retired. The Collector no longer copies any
+; file into the Chipsoft folder. It installs a Windows Service + tray app;
+; the service switches on the genuine Chipsoft driver's own logging by
+; setting LogLevel:0 in C:\ProgramData\CHIPSOFT_J2534\options.json and
+; harvests the driver's *.log files. Nothing to back up, nothing to restore.
 ;
 ; Pre-requisites for build (see ../README.md for the full pipeline):
 ;   - Service published:  src\OpenSAAB.Collector.Service\bin\Release\net8.0\win-x64\publish\OpenSAAB.Collector.Service.exe
 ;   - Tray published:     src\OpenSAAB.Collector.Tray\bin\Release\net8.0-windows\win-x64\publish\OpenSAAB.Collector.Tray.exe
-;   - Shim DLLs built:    ..\..\Chipsoft_RE\shim\cstech2win\build\CSTech2Win.dll
-;                         ..\..\Chipsoft_RE\shim\j2534\build\j2534_interface.dll
 
 #define AppName        "OpenSAAB Collector"
-#define AppVersion     "0.3.0"
+#define AppVersion     "0.4.1"
 #define AppPublisher   "OpenSAAB"
 #define AppURL         "https://opensaab.com"
 #define ServiceName    "OpenSAABCollector"
@@ -43,22 +47,7 @@ InfoBeforeFile=consent.txt
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
-; Shim DLLs go straight into the Chipsoft install dir.
-; replacesameversion + uninsneveruninstall: at uninstall the [UninstallRun]
-; section will instead restore the *_real.dll backups, so we don't want
-; the uninstaller to also delete our shim — it'd race the restore.
-Source: "..\..\Chipsoft_RE\shim\cstech2win\build\CSTech2Win.dll"; \
-    DestDir: "{#ChipsoftDir}"; DestName: "CSTech2Win.dll"; \
-    Flags: ignoreversion uninsneveruninstall
-
-; v0.1.7: j2534_interface.dll shim removed from default install. Tech2Win
-; uses CSTech2Win.dll (D-PDU API), not j2534_interface.dll, so the j2534
-; shim sat idle for the median contributor — only TrionicCANFlasher /
-; OpenPort users would benefit. Strip-down keeps the install lean and
-; avoids one more Restart Manager corner case. Source still lives in
-; Chipsoft_RE/shim/j2534/ for advanced users who want to swap manually.
-
-; Service + tray go to {app} (Program Files\OpenSAAB\Collector).
+; v0.4.0: NO shim DLLs. Only the service + tray go to {app}.
 Source: "..\src\OpenSAAB.Collector.Service\bin\Release\net8.0\win-x64\publish\OpenSAAB.Collector.Service.exe"; \
     DestDir: "{app}"; Flags: ignoreversion
 
@@ -69,7 +58,7 @@ Source: "consent.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\OpenSAAB Collector Tray"; Filename: "{app}\OpenSAAB.Collector.Tray.exe"
-Name: "{group}\Uninstall OpenSAAB Collector"; Filename: "{uninstallexe}"; Comment: "Stops the service, restores the genuine Chipsoft DLLs, removes everything"
+Name: "{group}\Uninstall OpenSAAB Collector"; Filename: "{uninstallexe}"; Comment: "Stops the service and removes everything"
 Name: "{userstartup}\OpenSAAB Collector Tray"; Filename: "{app}\OpenSAAB.Collector.Tray.exe"
 
 [Tasks]
@@ -77,47 +66,41 @@ Name: "consentupload"; Description: "Upload captured logs to openSAAB.com (recom
 
 [Registry]
 ; ConsentVersion is set whichever way the user goes — even local-only
-; users acknowledged the disclosure.
-Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName: "ConsentVersion"; ValueData: "v1"; Flags: uninsdeletekey
+; users acknowledged the disclosure. Bumped to v2 for the v0.4.0 model
+; change (driver-native logging instead of DLL shims).
+Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName: "ConsentVersion"; ValueData: "v2"; Flags: uninsdeletekey
 ; openSAAB.com DNS hasn't been pointed at the Koyeb deployment yet — until
 ; that lands, ship the Koyeb domain directly so fresh installs don't 404.
 Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: string; ValueName: "IngestUrl"; ValueData: "https://relevant-diann-djfremen2-c013cdc3.koyeb.app/ingest/shim-log"
-; UploadEnabled mirrors the consentupload task — written via [Code] below.
 ; UploadCount: pre-create with users-modify so the unelevated tray can
-; increment it after each successful upload (v0.1.7 fix; previously the
-; tray's IncrementUploadCount silently failed on HKLM permission denied).
+; increment it after each successful upload.
 Root: HKLM; Subkey: "SOFTWARE\OpenSAAB\Collector"; ValueType: dword; ValueName: "UploadCount"; ValueData: "0"; Permissions: users-modify; Flags: uninsdeletevalue createvalueifdoesntexist
 
-[Dirs]
-; v0.3.0: canonical capture directory shared by Worker (FileSystemWatcher
-; observes) and UsbPcapSupervisor (writes new .pcapng files). Pinned to
-; ProgramData with explicit Everyone:RWX so the LocalSystem service can
-; watch+write reliably regardless of how Windows resolves Path.GetTempPath()
-; for service accounts. The v0.2.x bug where the watcher attach silently
-; failed on per-service C:\Windows\SystemTemp ACLs is fixed by always
-; using this stable path. NOT uninstalled — keeps captures for debug.
-Name: "{commonpf}\..\..\ProgramData\OpenSAAB\Captures"; \
-    Permissions: everyone-modify; \
-    Flags: uninsneveruninstall
+; v0.4.1: NO [Dirs] entry for the Chipsoft logs subdirectory. That folder
+; belongs to the OEM driver — it creates it lazily when its Boost.Log
+; sink first writes. Pre-creating it can mask diagnostic signal and may
+; interfere with the driver's own sink-init path. The Service polls and
+; lazily attaches its FileSystemWatcher once the driver creates the dir.
 
 [Run]
 ; --- Pre-install: refuse if Chipsoft isn't there. Done in [Code] PrepareToInstall. ---
 
-; Backup the genuine Chipsoft DLLs (only on first install — guarded by
-; "exist" check so a re-install doesn't clobber an existing backup).
+; Migration: if a pre-v0.4.0 Collector swapped in DLL shims, restore the
+; genuine Chipsoft DLLs from the *_real.dll backups so the retired shims
+; stop running. Harmless if no backup exists (fresh install).
 Filename: "{cmd}"; \
-    Parameters: "/c if not exist ""{#ChipsoftDir}\CSTech2Win_real.dll"" move /Y ""{#ChipsoftDir}\CSTech2Win.dll"" ""{#ChipsoftDir}\CSTech2Win_real.dll"""; \
-    StatusMsg: "Backing up genuine CSTech2Win.dll…"; \
-    Flags: runhidden waituntilterminated; \
-    BeforeInstall: NoOp
-
-; v0.1.7: j2534 backup step removed alongside the shim drop.
+    Parameters: "/c if exist ""{#ChipsoftDir}\CSTech2Win_real.dll"" (del /Q ""{#ChipsoftDir}\CSTech2Win.dll"" & move /Y ""{#ChipsoftDir}\CSTech2Win_real.dll"" ""{#ChipsoftDir}\CSTech2Win.dll"")"; \
+    StatusMsg: "Restoring genuine Chipsoft DLL (migration from shim era)…"; \
+    Flags: runhidden waituntilterminated
+Filename: "{cmd}"; \
+    Parameters: "/c if exist ""{#ChipsoftDir}\j2534_interface_real.dll"" (del /Q ""{#ChipsoftDir}\j2534_interface.dll"" & move /Y ""{#ChipsoftDir}\j2534_interface_real.dll"" ""{#ChipsoftDir}\j2534_interface.dll"")"; \
+    Flags: runhidden waituntilterminated
 
 ; Install + start the Windows Service.
 Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= ""\""{app}\OpenSAAB.Collector.Service.exe\"""" start= auto DisplayName= ""OpenSAAB Collector"""; \
     StatusMsg: "Installing OpenSAAB Collector service…"; \
     Flags: runhidden waituntilterminated
-Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""Watches C:\ProgramData\OpenSAAB\Captures and %TEMP% for shim logs + USBPcap captures from Tech2Win / J2534 clients and uploads to openSAAB.com if consent given."""; \
+Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""Switches on the Chipsoft J2534 driver's native logging and uploads the resulting logs to openSAAB.com if consent is given."""; \
     Flags: runhidden waituntilterminated
 Filename: "{sys}\sc.exe"; Parameters: "start {#ServiceName}"; \
     StatusMsg: "Starting OpenSAAB Collector service…"; \
@@ -134,57 +117,40 @@ Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden wa
 Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden waituntilterminated
 ; Kill the tray app if it's running.
 Filename: "{cmd}"; Parameters: "/c taskkill /IM OpenSAAB.Collector.Tray.exe /F >nul 2>&1"; Flags: runhidden waituntilterminated
-
-; Restore genuine Chipsoft DLLs.
-Filename: "{cmd}"; \
-    Parameters: "/c if exist ""{#ChipsoftDir}\CSTech2Win_real.dll"" (del /Q ""{#ChipsoftDir}\CSTech2Win.dll"" & move /Y ""{#ChipsoftDir}\CSTech2Win_real.dll"" ""{#ChipsoftDir}\CSTech2Win.dll"")"; \
-    Flags: runhidden waituntilterminated
-; v0.1.7: also restore the genuine j2534_interface.dll if a previous Collector
-; (≤ v0.1.6) had backed it up — keeps uninstall idempotent across versions.
-Filename: "{cmd}"; \
-    Parameters: "/c if exist ""{#ChipsoftDir}\j2534_interface_real.dll"" (del /Q ""{#ChipsoftDir}\j2534_interface.dll"" & move /Y ""{#ChipsoftDir}\j2534_interface_real.dll"" ""{#ChipsoftDir}\j2534_interface.dll"")"; \
-    Flags: runhidden waituntilterminated
+; v0.4.0 never modified the Chipsoft folder, so there is nothing to restore.
 
 [Code]
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  ChipsoftCs, ChipsoftJ: String;
+  ChipsoftDirPath, ChipsoftCs: String;
   RC: Integer;
 begin
   Result := '';
-  ChipsoftCs := ExpandConstant('{#ChipsoftDir}\CSTech2Win.dll');
-  ChipsoftJ  := ExpandConstant('{#ChipsoftDir}\j2534_interface.dll');
-  if (not FileExists(ChipsoftCs)) and (not FileExists(ExpandConstant('{#ChipsoftDir}\CSTech2Win_real.dll'))) then begin
-    Result := 'CSTech2Win.dll not found in ' + ExpandConstant('{#ChipsoftDir}') + #13#10 +
-              'OpenSAAB Collector requires a working Chipsoft J2534 Pro install. Please install Chipsoft first, then re-run this installer.';
-    Exit;
-  end;
-  if (not FileExists(ChipsoftJ)) and (not FileExists(ExpandConstant('{#ChipsoftDir}\j2534_interface_real.dll'))) then begin
-    Result := 'j2534_interface.dll not found in ' + ExpandConstant('{#ChipsoftDir}') + #13#10 +
-              'OpenSAAB Collector requires a working Chipsoft J2534 Pro install.';
+  ChipsoftDirPath := ExpandConstant('{#ChipsoftDir}');
+  ChipsoftCs := ChipsoftDirPath + '\CSTech2Win.dll';
+  // Require a working Chipsoft J2534 Pro install. Accept either the live
+  // DLL or a *_real.dll backup left by a pre-v0.4.0 Collector.
+  if (not DirExists(ChipsoftDirPath)) or
+     ((not FileExists(ChipsoftCs)) and
+      (not FileExists(ChipsoftDirPath + '\CSTech2Win_real.dll'))) then begin
+    Result := 'Chipsoft J2534 Pro driver not found in ' + ChipsoftDirPath + #13#10 +
+              'OpenSAAB Collector requires a working Chipsoft J2534 Pro install. ' +
+              'Please install Chipsoft first, then re-run this installer.';
     Exit;
   end;
   // Stop the previous Collector so its tray.exe and service.exe stop
-  // holding their own files open. Restart Manager often misses the
-  // unelevated tray, leaving the user staring at "Setup was unable to
-  // automatically close all applications" mid-upgrade.
+  // holding their own files open.
   Exec(ExpandConstant('{cmd}'),
        '/c sc stop {#ServiceName} >nul 2>&1 & taskkill /F /IM OpenSAAB.Collector.Tray.exe >nul 2>&1',
        '', SW_HIDE, ewWaitUntilTerminated, RC);
-  // v0.1.7: Tech2Win's diagnostic engine (emulator.exe) often stays running
-  // headless after the GUI window closes, holding our shim DLL open. Restart
-  // Manager's WM_CLOSE doesn't reach a windowless process, so installs hang on
-  // "files in use." Kill ONLY orphaned (no MainWindowTitle) emulator.exe
-  // instances; leave alone any with a visible window so an active Tech2Win
-  // session still gets the polite Restart Manager prompt.
+  // Migration aid: a pre-v0.4.0 install left DLL shims in the Chipsoft
+  // folder. Tech2Win's headless emulator.exe can keep a shim DLL loaded
+  // after the GUI closes, blocking the [Run] restore step. Kill ONLY
+  // orphaned (no MainWindowTitle) emulator.exe instances so the genuine
+  // DLL can be moved back into place; leave any with a visible window.
   Exec(ExpandConstant('{cmd}'),
        '/c powershell -NoProfile -Command "Get-Process -Name emulator -ErrorAction SilentlyContinue | Where-Object { [string]::IsNullOrEmpty($_.MainWindowTitle) } | Stop-Process -Force -ErrorAction SilentlyContinue"',
        '', SW_HIDE, ewWaitUntilTerminated, RC);
-end;
-
-procedure NoOp;
-begin
-  // [Run] BeforeInstall placeholder.
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
