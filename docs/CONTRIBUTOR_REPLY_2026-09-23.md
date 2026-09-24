@@ -6,5 +6,7 @@ Stop and save the capture locally. Please don't attach the raw file publicly bec
 
 I'm adapting OpenSAAB-Collector for this, with a separate capture-only workflow that leaves your existing driver alone. One correction to my earlier wording: the trace gives us valuable evidence to build and test against, but I can't promise a single file contains everything required for a working Android driver.
 
+Capture guide: https://github.com/djfremen/OpenSAAB-Collector/blob/main/portable/README.md
+
 Reference: https://www.wireshark.org/docs/relnotes/wireshark-4.0.17.html
 USBPcap: https://desowin.org/usbpcap/
