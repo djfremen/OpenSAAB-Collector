@@ -19,7 +19,7 @@ namespace OpenSaab.Collector {
  public static class SanitizeReportDialog {
   public static DialogResult Show(IWin32Window owner,SanitizeReport report,bool upload){
    using(var form=new Form{Text=upload?"Review sanitization before upload":"Sanitization report",Font=new Font("Segoe UI",10),ClientSize=new Size(680,560),MinimumSize=new Size(550,450),StartPosition=FormStartPosition.CenterParent}){
-    var text=new TextBox{Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,Text=report.Summary()};form.Controls.Add(text);
+    var text=new TextBox{Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,Text=(upload?"Send this reviewed copy privately to OpenSAAB? Nothing is sent until you choose Upload this copy.\r\n\r\n":"")+report.Summary()};form.Controls.Add(text);
     var row=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=50,FlowDirection=FlowDirection.RightToLeft,Padding=new Padding(8)};form.Controls.Add(row);
     var close=new Button{Text=upload?"Cancel":"Close",DialogResult=DialogResult.Cancel,Width=125,Height=32};row.Controls.Add(close);form.CancelButton=close;
     if(upload){var send=new Button{Text="Upload this copy",DialogResult=DialogResult.OK,Width=190,Height=32};row.Controls.Add(send);}
