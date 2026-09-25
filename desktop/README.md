@@ -12,21 +12,49 @@ changes, background service or diagnostic commands. Wireshark is not required.**
 3. Reopen Collector. Select your USB adapter from the list. If you are unsure,
    compare the list before and after plugging in the adapter, then refresh.
    Leave your existing Mongoose, Chipsoft or other manufacturer's driver installed.
-4. Confirm the private upload notice, then choose **Start capture** before opening
+4. Acknowledge the capture privacy notice, then choose **Start capture** before opening
    Tech2Win. Keep the adapter connected throughout the recording.
 5. Use Tech2Win normally: select the adapter, read VIN, ECM information and DTCs.
    **Add step note** records menu/action notes with timestamps. Begin with a short
    initialization/VIN session. No need to clear codes, program or unlock anything.
-6. Choose **Stop & upload**. Collector closes the capture, validates the pcap,
-   packages it with session details and notes, then uploads to OpenSAAB's private
-   Cloudflare R2 storage. It shows confirmation only after the server verifies
-   storage and the client verifies the receipt matches its file.
+6. Choose **Stop capture**. Collector closes and validates the capture and saves
+   it locally. Nothing is uploaded.
+7. Choose **Open saved files** and review the files as described below.
+8. Choose **Upload**, select the reviewed capture folder and confirm. Collector
+   rebuilds the bundle from the current files and uploads it privately. It shows
+   confirmation only after verifying the server receipt matches the sent file.
 
 Files remain in `Documents\OpenSAAB-Captures`. If the network or server is down,
-use **Retry saved upload** later. Closing the app is blocked while capturing or
+use **Upload** again later. Closing the app is blocked while capturing or
 uploading. Each recording is limited to 15 minutes or approximately 60 MiB;
-reaching a limit stops and uploads the completed recording automatically.
+reaching a limit stops and saves locally, without upload.
 An interrupted or structurally incomplete capture stays local and is not uploaded.
+
+### Review before upload
+
+Only these three files from the folder you select are packaged:
+
+- `usb.pcap`: raw USB packets. Personal identifiers and security data can be in
+  packet payloads and device descriptors, not just readable text. Collector has
+  no built-in packet viewer or automatic redaction. Use a capture-aware editor
+  to inspect or remove packets; save back as classic USBPcap PCAP, not PCAPNG.
+  Removing exchanges can reduce the capture's usefulness for adapter development.
+- `session.json`: capture metadata. You can blank the `adapter` and `device_label`
+  string values to remove entered descriptions or device serials. Retain the
+  JSON field names and capture-format fields. The capture checksum is recalculated
+  automatically in the new upload bundle after changes to `usb.pcap`.
+- `actions.jsonl`: your notes. Remove individual complete lines, edit their text
+  while preserving JSON, or leave the file empty to omit all notes.
+
+Edit these files, **not `capture.zip`**. Every upload builds a fresh ZIP; it never
+reuses an old ZIP from a failed attempt. Other local files, including worker
+configuration and upload receipts, are not included. Save and close your edits
+before choosing Upload. You may copy a capture folder and upload the edited copy.
+
+Validation checks capture structure, not whether personal information remains.
+If you are not comfortable sharing the reviewed contents, cancel Upload and keep
+it local. A new upload does not delete a previously submitted original; contact
+OpenSAAB privately with its receipt if that original needs deletion.
 
 Captures can include VINs, adapter serials and security traffic. Only select your
 adapter; do not select other peripherals or share raw captures publicly.
@@ -49,7 +77,8 @@ The application contains an HTTPS upload address, **no Cloudflare credentials**.
 
 On Windows, run `desktop\build.ps1` in Windows PowerShell. It uses the installed
 .NET Framework C# compiler and creates `desktop\bin\OpenSAAB-Collector.exe`.
-`WorkerTest.cs` and `UploadTest.cs` are developer harnesses, excluded from the app.
+`WorkerTest.cs`, `UploadTest.cs` and `BundleTest.cs` are developer harnesses, excluded from the app.
+Run `desktop\test.ps1` to check fresh packaging, edited captures and invalid-input rejection.
 The release executable is currently unsigned.
 
 ## Capture engine

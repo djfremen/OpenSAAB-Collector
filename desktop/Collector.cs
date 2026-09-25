@@ -1,6 +1,6 @@
 using System;using System.IO;using System.Net;using System.Net.Http;using System.Diagnostics;using System.Drawing;using System.Windows.Forms;using System.Threading.Tasks;using System.Text;using System.Text.RegularExpressions;using System.Collections.Generic;using System.Web.Script.Serialization;using System.Security.Cryptography;using System.IO.Compression;
-[assembly:System.Reflection.AssemblyVersion("0.5.1.0")]
-[assembly:System.Reflection.AssemblyFileVersion("0.5.1.0")]
+[assembly:System.Reflection.AssemblyVersion("0.5.2.0")]
+[assembly:System.Reflection.AssemblyFileVersion("0.5.2.0")]
 [assembly:System.Reflection.AssemblyProduct("OpenSAAB Collector")]
 [assembly:System.Reflection.AssemblyDescription("Private USB adapter capture and upload")]
 namespace OpenSaab.Collector {
@@ -15,15 +15,29 @@ namespace OpenSaab.Collector {
   public override string ToString(){return Hub.Replace(@"\\.\","")+" — "+Label;}
  }
  public static class Bundle {
-  public const string Version="0.5.1";
+  public const string Version="0.5.2";
   public const string Consent="collector-capture-v1";
   public const string Endpoint="https://www.opensaab.com/api/collector/captures";
   public static string Hash(string path){using(var f=File.OpenRead(path))using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(f)).Replace("-","").ToLowerInvariant();}
   public static string Build(string dir){
-   string zip=Path.Combine(dir,"capture.zip");if(File.Exists(zip))return zip;
-   string temp=zip+".tmp";if(File.Exists(temp))File.Delete(temp);
-   using(var z=ZipFile.Open(temp,ZipArchiveMode.Create)){foreach(string name in new[]{"usb.pcap","session.json","actions.jsonl"})z.CreateEntryFromFile(Path.Combine(dir,name),name,CompressionLevel.Optimal);}
-   if(new FileInfo(temp).Length>64L*1024*1024)throw new Exception("Capture exceeds upload limit; files are saved locally");File.Move(temp,zip);return zip;
+   // Always package a fresh snapshot. A previously failed upload may contain
+   // personal data that the contributor has since removed from the source files.
+   string zip=Path.Combine(dir,"capture.zip");
+   string snapshot=Path.Combine(dir,".upload-"+Guid.NewGuid().ToString("N")),temp=snapshot+".zip";
+   Directory.CreateDirectory(snapshot);
+   try{
+    foreach(string name in new[]{"usb.pcap","session.json","actions.jsonl"})File.Copy(Path.Combine(dir,name),Path.Combine(snapshot,name));
+    string meta=Path.Combine(snapshot,"session.json"),capture=Path.Combine(snapshot,"usb.pcap");
+    var data=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(meta));
+    if((string)data["consent"]!=Consent || (string)data["capture_state"]!="stopped_gracefully")throw new Exception("Select a completed capture. Interrupted recordings cannot be uploaded.");
+    CaptureEngine.Validate(capture,Convert.ToInt32(data["usb_address"]));
+    data["capture_sha256"]=Hash(capture);CaptureEngine.Save(meta,data);
+    File.SetLastWriteTimeUtc(meta,File.GetLastWriteTimeUtc(Path.Combine(dir,"session.json")));
+    using(var z=ZipFile.Open(temp,ZipArchiveMode.Create)){foreach(string name in new[]{"usb.pcap","session.json","actions.jsonl"})z.CreateEntryFromFile(Path.Combine(snapshot,name),name,CompressionLevel.Optimal);}
+    if(new FileInfo(temp).Length>64L*1024*1024)throw new Exception("Capture exceeds upload limit; files are saved locally");
+    if(File.Exists(zip))File.Replace(temp,zip,null);else File.Move(temp,zip);
+    return zip;
+   }finally{if(File.Exists(temp))File.Delete(temp);Directory.Delete(snapshot,true);}
   }
   public static async Task<string> Upload(string dir){
    string zip=Build(dir),digest=Hash(zip);
@@ -55,13 +69,13 @@ namespace OpenSaab.Collector {
    devices.SetBounds(24,134,500,30);devices.DropDownStyle=ComboBoxStyle.DropDownList;Controls.Add(devices);Btn(refresh,"Refresh",536,132,128,32,async delegate{await RefreshDevices();});
    adapter.SetBounds(24,177,640,27);adapter.MaxLength=240;Controls.Add(adapter);AddLabel("Adapter model / driver version / car model and year (optional)",24,208,640,24,9,false);
    Btn(setup,"Set up USBPcap",24,243,170,34,async delegate{await Install();});AddLabel("Wireshark is not required. First driver install needs a restart.",207,248,454,30,9,false);
-   consent.SetBounds(24,290,640,52);consent.Text="I agree to upload this adapter capture privately to OpenSAAB when I stop.\nIt may contain my VIN, adapter serial and diagnostic/security data.";Controls.Add(consent);
-   Btn(start,"Start capture",24,357,194,42,async delegate{await StartCapture();});Btn(stop,"Stop & upload",234,357,194,42,async delegate{await Finish();});stop.Enabled=false;
+   consent.SetBounds(24,290,640,52);consent.Text="I understand this recording may contain VINs, serials and security data.\nCaptures stay on this computer until I choose Upload and confirm.";Controls.Add(consent);
+   Btn(start,"Start capture",24,357,194,42,async delegate{await StartCapture();});Btn(stop,"Stop capture",234,357,194,42,async delegate{await Finish();});stop.Enabled=false;
    Btn(folder,"Open saved files",445,357,219,42,delegate{Process.Start(session ?? BaseDir());});
    note.SetBounds(24,418,500,28);note.MaxLength=400;Controls.Add(note);Btn(add,"Add step note",536,415,128,34,delegate{AddNote();});add.Enabled=false;
    status.SetBounds(24,460,640,56);status.Text="Connect the adapter, then refresh.";Controls.Add(status);
-   Btn(retry,"Retry saved upload",24,522,205,32,async delegate{await Retry();});
-   AddLabel("Private uploads • Local copy retained • No driver shims",245,528,435,24,9,false);
+   Btn(retry,"Upload",24,522,205,32,async delegate{await UploadSaved();});
+   AddLabel("Review locally • Upload only when you choose",245,528,435,24,9,false);
    timer.Interval=500;timer.Tick+=async delegate{if(worker!=null && !busy && !finishing){if(worker.HasExited)await Finish();else status.Text="Recording — launch Tech2Win, select your adapter, then read VIN / ECM information / DTCs.\nElapsed: "+(DateTime.UtcNow-captureStarted).ToString(@"mm\:ss")+" (15-minute / 60 MiB limit)";}};timer.Start();
    Shown+=async delegate{await RefreshDevices();};FormClosing+=delegate(object sender,FormClosingEventArgs e){if(worker!=null || busy){e.Cancel=true;MessageBox.Show("Finish the capture or current upload before closing. Local files will be retained.",Text);}};
   }
@@ -96,7 +110,7 @@ namespace OpenSaab.Collector {
    using(var p=Process.Start(new ProcessStartInfo(path){UseShellExecute=true}))await Task.Run(delegate{p.WaitForExit();});
    status.Text="If USBPcap was installed, restart Windows and reopen Collector before recording.";
   }catch(Exception e){Error(e);}finally{SetBusy(false);}}
-  async Task StartCapture(){if(!consent.Checked){MessageBox.Show("Please confirm the private upload notice before recording.",Text);return;}var device=devices.SelectedItem as UsbDevice;if(device==null){MessageBox.Show("Select your adapter first.",Text);return;}
+  async Task StartCapture(){if(!consent.Checked){MessageBox.Show("Please acknowledge the capture privacy notice before recording.",Text);return;}var device=devices.SelectedItem as UsbDevice;if(device==null){MessageBox.Show("Select your adapter first.",Text);return;}
    SetBusy(true);try{
     using(var service=new System.ServiceProcess.ServiceController("OpenSAABCollector")){try{if(service.Status==System.ServiceProcess.ServiceControllerStatus.Running)throw new Exception("The old Collector service is running. Stop it before recording; it has a separate uploader.");}catch(InvalidOperationException){}}
     if(Process.GetProcessesByName("USBPcapCMD").Length>0)throw new Exception("Another USBPcap process is running. Stop it first.");
@@ -122,13 +136,13 @@ namespace OpenSaab.Collector {
    if(!(bool)result["graceful"])throw new Exception("Capture was interrupted. Files retained locally; not uploaded.");
    var summary=await Task.Run(()=>CaptureEngine.Validate(Path.Combine(session,"usb.pcap"),(int)manifest["usb_address"]));
    manifest["capture_sha256"]=Bundle.Hash(Path.Combine(session,"usb.pcap"));CaptureEngine.Save(Path.Combine(session,"session.json"),manifest);
-   status.Text="Saved "+summary.packets+" packets. Uploading privately to OpenSAAB…";
-   string receipt=await Bundle.Upload(session);status.Text="Upload confirmed: "+receipt.Substring(0,22)+"…\nLocal files and full receipt saved. Thank you!";
+   status.Text="Saved "+summary.packets+" packets locally. Nothing uploaded.\nUse Open saved files to review, then Upload when ready.";
   }catch(Exception e){Error(e);}finally{finishing=false;SetBusy(false);}}
-  async Task Retry(){using(var dialog=new FolderBrowserDialog{Description="Select the completed OpenSAAB capture folder",SelectedPath=BaseDir()}){if(dialog.ShowDialog()!=DialogResult.OK)return;SetBusy(true);try{
-   string dir=dialog.SelectedPath;var data=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(dir,"session.json")));
-   if((string)data["consent"]!=Bundle.Consent || (string)data["capture_state"]!="stopped_gracefully")throw new Exception("This folder has no completed capture with upload consent.");
-   CaptureEngine.Validate(Path.Combine(dir,"usb.pcap"),Convert.ToInt32(data["usb_address"]));session=dir;status.Text="Retrying private upload…";string receipt=await Bundle.Upload(dir);status.Text="Upload confirmed: "+receipt.Substring(0,22)+"…\nLocal files retained.";
-  }catch(Exception e){Error(e);}finally{SetBusy(false);}}}
+  async Task UploadSaved(){using(var dialog=new FolderBrowserDialog{Description="Select the reviewed OpenSAAB capture folder to upload",SelectedPath=session ?? BaseDir()}){if(dialog.ShowDialog()!=DialogResult.OK)return;
+   string dir=dialog.SelectedPath;
+   if(MessageBox.Show("Upload the current files from this folder privately to OpenSAAB?\n\n"+dir+"\n\nFiles: usb.pcap, session.json and actions.jsonl. An older capture.zip is rebuilt from these files.\n\nReview or edit these files first using Open saved files. Raw captures can contain VINs, adapter serials and security data; Collector does not automatically redact them. Packet validation does not check for personal data.\n\nChoose Cancel to keep everything local.","Confirm private upload",MessageBoxButtons.OKCancel,MessageBoxIcon.Information,MessageBoxDefaultButton.Button2)!=DialogResult.OK)return;
+   SetBusy(true);try{
+    session=dir;status.Text="Checking reviewed files and uploading privately…";string receipt=await Bundle.Upload(dir);status.Text="Upload confirmed: "+receipt.Substring(0,22)+"…\nLocal files and full receipt saved.";
+   }catch(Exception e){Error(e);}finally{SetBusy(false);}}}
  }
 }

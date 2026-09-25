@@ -3,11 +3,18 @@
 Applies to the new desktop capture app; consent identifier `collector-capture-v1`.
 The older service's policy in `privacy.md` does not describe this app.
 
-Before recording, you select one USB device and agree that its completed capture
-will be uploaded privately to OpenSAAB. Collector does not record until you click
-Start. Stop & upload (or the recording time/size limit) finishes the recording
-and automatically attempts upload. No Windows service or background collection
-is installed. The separate USBPcap driver remains installed until you remove it.
+In 0.5.2 and later, you select one USB device and acknowledge the capture privacy
+notice before recording. Collector does not record until you click Start.
+**Stop capture**, a normal worker exit, or reaching the recording time/size limit
+saves locally only. Nothing is uploaded automatically. Use **Open saved files**
+to review or edit, then **Upload** to select a folder and separately confirm
+sending its current files. You can cancel and keep everything local.
+
+Versions 0.5.0 and 0.5.1 used **Stop & upload** and automatically attempted upload
+when recording ended. Upgrade before relying on this review step.
+
+No Windows service or background collection is installed. The separate USBPcap
+driver remains installed until you remove it.
 
 The upload contains:
 - The selected device's USB packet capture, including descriptors, requests and
@@ -27,8 +34,16 @@ reading captures. No Cloudflare credentials are distributed in Collector.
 
 Your local files are retained, including if an upload fails. A confirmed receipt
 means storage was verified, not that the recording proves a particular diagnostic
-function worked. Retry saved upload resends a completed bundle with its existing
-consent; byte-identical retries use the same storage key.
+function worked. **Upload** also retries a failed send, with confirmation each
+time. It builds a fresh snapshot of `usb.pcap`, `session.json` and `actions.jsonl`,
+validates the PCAP structure and updates its checksum. Cached ZIPs are not reused.
+The wire consent identifier remains `collector-capture-v1`; upload authorization
+is now obtained at the explicit confirmation, not at capture start.
+
+Collector does not automatically find or remove personal information. See the
+[review instructions](../desktop/README.md#review-before-upload). Structural
+validation is not proof of anonymization. Editing a local copy does not remove
+an original that you have already uploaded.
 
 No automatic server retention/deletion period is currently configured. To request
 deletion, contact the maintainer through the repository and provide your receipt

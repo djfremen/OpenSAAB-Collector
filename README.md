@@ -1,7 +1,7 @@
 # OpenSAAB Collector
 
-A simple Windows tool: **set up USBPcap → capture your adapter → stop and upload
-privately to OpenSAAB.** No shims, driver DLL changes or background service.
+A simple Windows tool: **set up USBPcap → capture your adapter → stop → review → upload
+privately to OpenSAAB when you choose.** No shims, driver DLL changes or background service.
 Wireshark is not required.
 
 ## Capture and upload
@@ -12,10 +12,14 @@ Use your existing adapter driver and Tech2Win installation. Start with a short
 initialization/VIN recording, then ECM information and DTC reads. Select only
 your adapter and keep it connected throughout the session.
 
-After you accept the capture/upload notice and click **Stop & upload**, Collector
-validates the recording, sends it to private Cloudflare R2 storage and saves a
-verified receipt. Your local copy is retained. Use **Retry saved upload** if the
-connection fails. No Cloudflare passwords or storage keys are in the app.
+**Stop capture** saves and validates the recording locally. It never uploads,
+including when the recording time/size limit is reached. Use **Open saved files**
+to review or edit the capture and metadata, then **Upload** to select a completed
+folder and confirm sending it. Upload also retries a failed send. Each upload
+rebuilds the ZIP from the current files, so a cached ZIP cannot undo your edits.
+Collector does not automatically scrub packet contents. See the
+[review instructions](desktop/README.md#review-before-upload).
+No Cloudflare passwords or storage keys are in the app.
 
 **Validation:** Windows 10 / Chipsoft Pro capture and private R2 round-trip tested.
 Windows 8.1 / Mongoose remains to be tested. See the
