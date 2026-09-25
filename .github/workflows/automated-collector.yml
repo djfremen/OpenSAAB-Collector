@@ -22,9 +22,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Build standalone Windows app
+      - name: Build and test standalone Windows app
         shell: powershell
-        run: ./desktop/build.ps1
+        run: ./desktop/test.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: OpenSAAB-Collector-Windows
