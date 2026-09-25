@@ -17,7 +17,9 @@ including when the recording time/size limit is reached. Use **Open saved files*
 to review or edit the capture and metadata, then **Upload** to select a completed
 folder and confirm sending it. Upload also retries a failed send. Each upload
 rebuilds the ZIP from the current files, so a cached ZIP cannot undo your edits.
-Collector does not automatically scrub packet contents. See the
+The **Sanitize capture** action creates a separate copy and a report of supported
+VIN/name/serial text redactions. It does not guarantee anonymity: split identifiers,
+other encodings and security exchanges may remain. See the
 [review instructions](desktop/README.md#review-before-upload).
 No Cloudflare passwords or storage keys are in the app.
 

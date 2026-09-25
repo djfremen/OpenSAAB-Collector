@@ -19,7 +19,8 @@ changes, background service or diagnostic commands. Wireshark is not required.**
    initialization/VIN session. No need to clear codes, program or unlock anything.
 6. Choose **Stop capture**. Collector closes and validates the capture and saves
    it locally. Nothing is uploaded.
-7. Choose **Open saved files** and review the files as described below.
+7. Choose **Sanitize capture** to create a redacted copy and local report, or
+   **Open saved files** to review manually. See the coverage limits below.
 8. Choose **Upload**, select the reviewed capture folder and confirm. Collector
    rebuilds the bundle from the current files and uploads it privately. It shows
    confirmation only after verifying the server receipt matches the sent file.
@@ -30,13 +31,52 @@ uploading. Each recording is limited to 15 minutes or approximately 60 MiB;
 reaching a limit stops and saves locally, without upload.
 An interrupted or structurally incomplete capture stays local and is not uploaded.
 
+### Sanitize capture (0.5.3)
+
+This is a local operation; no network request is made. Select a completed capture,
+optionally enter a known VIN and adapter serial, and check the computer name to
+mask. The suggested computer name is the PC running Collector; change it if the
+capture came from a different computer. Names and serials use exact,
+case-insensitive printable ASCII matching (3–128 characters).
+
+Collector creates a separate sibling folder and selects it for subsequent upload.
+The original stays unchanged. By default, step notes, adapter description and
+USB device label are removed. You can instead retain them with matching text
+masked. The report lists actual occurrence counts for known VINs, additional
+VIN-shaped strings, the supplied computer name and serial, plus removed notes
+and fields, scanned/changed packets and the first 200 change locations. It never
+records the original identifiers. Counts are occurrences, not unique vehicles.
+
+**Coverage is deliberately limited:** complete, contiguous ASCII or UTF-16 text
+within an individual USB payload, and supported text metadata/notes. Automatic
+VIN detection requires 17 VIN-alphabet characters with letters and digits; these
+are VIN-shaped candidates, not validated VINs. Supplied identifiers improve
+matching. Split diagnostic messages, other encodings, unknown names/serials,
+other personal information and security seed/key exchanges may remain. Zero
+matches is not an anonymity certificate. No general USB/CAN reassembly or
+adapter-specific security redaction is implemented.
+
+Packet headers and lengths are preserved. Internal diagnostic checksums or
+meaning can change: sanitized captures are for analysis, not replay. The app
+revalidates PCAP structure and refreshes its checksum; this does not validate
+privacy or diagnostic correctness.
+
+Use **View report** to reopen the selected copy's report. Upload shows it again
+before you choose **Upload this copy**. If any of the three files changed since
+sanitizing, regenerate the report by sanitizing again. Removing the report from
+a marked sanitized copy also blocks packaging. The report stays local; only the
+three existing capture files go to the server. Session metadata marks the bundle
+as sanitized so maintainers know its contents were edited. Uploading an original
+folder is still possible, but its confirmation explicitly says there is no
+sanitization report.
+
 ### Review before upload
 
 Only these three files from the folder you select are packaged:
 
 - `usb.pcap`: raw USB packets. Personal identifiers and security data can be in
-  packet payloads and device descriptors, not just readable text. Collector has
-  no built-in packet viewer or automatic redaction. Use a capture-aware editor
+  packet payloads and device descriptors, not just readable text. The sanitizer only masks supported contiguous text; Collector has
+  no built-in packet viewer or general-purpose anonymizer. Use a capture-aware editor
   to inspect or remove packets; save back as classic USBPcap PCAP, not PCAPNG.
   Removing exchanges can reduce the capture's usefulness for adapter development.
 - `session.json`: capture metadata. You can blank the `adapter` and `device_label`
@@ -77,7 +117,7 @@ The application contains an HTTPS upload address, **no Cloudflare credentials**.
 
 On Windows, run `desktop\build.ps1` in Windows PowerShell. It uses the installed
 .NET Framework C# compiler and creates `desktop\bin\OpenSAAB-Collector.exe`.
-`WorkerTest.cs`, `UploadTest.cs` and `BundleTest.cs` are developer harnesses, excluded from the app.
+`WorkerTest.cs`, `UploadTest.cs`, `BundleTest.cs` and `SanitizeTest.cs` are developer harnesses, excluded from the app.
 Run `desktop\test.ps1` to check fresh packaging, edited captures and invalid-input rejection.
 The release executable is currently unsigned.
 

@@ -40,8 +40,19 @@ validates the PCAP structure and updates its checksum. Cached ZIPs are not reuse
 The wire consent identifier remains `collector-capture-v1`; upload authorization
 is now obtained at the explicit confirmation, not at capture start.
 
-Collector does not automatically find or remove personal information. See the
-[review instructions](../desktop/README.md#review-before-upload). Structural
+Starting in 0.5.3, **Sanitize capture** can mask supported contiguous VIN/name/serial
+text and remove notes/descriptions in a separate local copy. It shows occurrence
+counts and coverage limits before upload. Known input values are used in memory;
+the local report contains counts, file hashes and change locations, not the
+original identifiers. It is not included in the upload. Changing a reviewed file
+requires regenerating that report. Session metadata indicates that the capture
+was sanitized.
+
+This feature does not guarantee all personal information is removed. Fragmented
+or differently encoded identifiers and security exchanges can remain. Computer
+names/serials are matched only against supplied values; this PC's name is suggested,
+which may not be the source computer. No network is used for sanitization. See the
+[review instructions](../desktop/README.md#sanitize-capture-053). Structural
 validation is not proof of anonymization. Editing a local copy does not remove
 an original that you have already uploaded.
 
