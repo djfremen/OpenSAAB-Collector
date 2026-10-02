@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 22:34 PDT (JEV coverage routing and read-pool comparison). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-01 22:48 PDT (direct Nano beep acknowledgments without vendor SDK). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -28,9 +28,9 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`, `nano-beep-reference`, `nano-direct-beep`.
 
-Next test: Inspect creation/completion/shutdown of the vendor receive queue locally, comparing first USB submission boundaries. Prepare capture before adapter enumeration and a separate synchronized whole-vehicle reference when hardware setup is confirmed; payload semantics and the firmware command guard remain separate pending work.
+Next test: Confirm audible outcome and documented full power removal; repeat own-transport identification/beep before vendor applications. Continue receive-pool and changing startup-prelude analysis independently, then qualify bounded own CAN channel and read-only ECM identification.
 
 Complete when: Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.
 
@@ -60,11 +60,12 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 
 ## Next actions
 
+- **P1 · done · nano-direct-beep:** Own sender verified Nano identity and two beep success replies with no VCX library loaded; original Collector captures independently validate exchange. Audibility and cold start are still unverified.
 - **P1 · pending · nano-read-pool-coverage:** Seven-recording comparison and JEV routing favor receive-pool lifecycle inspection. Ten pending IN reads occur even with fully paired completions; do not treat them as proof of loss/crash. Whole-vehicle reference and loss counters still required for bounded CAN coverage.
 - **P1 · pending · nano-validity-semantics:** Reusable paired USB/SDK recorder repeats all five startup exchanges inside three successful validity calls. Twenty-five export hooks reveal no send/receive-export event inside them; next locate a reviewed lower transport boundary and determine input/reply handling without changing vendor checks.
 - **P1 · done · owner-gui:** Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command.
 - **P1 · pending · nano-firmware-policy:** Warm firmware startup and positive ECM VIN verified; engine entry blocked by local read-only command policy. Review data-definition semantics before any policy extension and separately test ECM information/DTC.
-- **P1 · pending · nano-cold:** Pending owner return: confirm complete Nano USB/bench power removal, then capture before Manager and perform a separately bounded firmware-handoff test. Adapter left untouched while owner is off-site.
+- **P1 · pending · nano-cold:** Confirm complete USB/bench power removal and capture before any vendor application. First repeat own-transport identity/beep, then separately qualify diagnostic initialization; warm direct beep does not settle cold-start dependency.
 - **P1 · pending · public-roundtrip:** Qualify the public 0.5.3 live Chipsoft capture/review/sanitized-upload/read-back path.
 - **P2 · pending · adapter-onboarding:** Collect exact-model Windows/driver/firmware profiles for Mongoose, MDI and other adapters; keep statuses untested until evidence exists.
 - **P2 · pending · model-corpus:** Model fact assessments remain rejected, including unsupported dropped-CAN inference. Typed experiment routing succeeds narrowly. Preserve these failures and build labelled missing-evidence/error cases before public advice or accuracy claims.
@@ -154,6 +155,15 @@ Evidence reference: owner-local: CAN_COVERAGE_JEV_2026-10-01.md.
 - **nano-coverage-tooling · saved_capture_and_synthetic · 2026-10-01 22:30 PDT · pass_scoped:** New private CLI compares seven distinct stopped Collector recordings and optional SDK evidence. All seven end with ten pending IN reads; three have zero orphan input completions, four have ten. In the paired trace, six orphan read keys reappear in later submissions and five remain pending, consistent with a read-pool boundary explanation without proving it. Zero frame/USB bulk errors in these recordings. Sixty-three tests pass for privacy, missing SDK evidence, truncated input, duplicate recording weighting, pointer reuse, immutable tool facts, model guards and cache/uncertainty. Originals preserved. Gap: Request IDs are reused pointers; no durable identity or missing history is established. No capture-drop counter, independent bus reference, qualified CAN decoder or whole-vehicle coverage. This is private Mini analysis of saved Collector files; installed Windows button is unchanged. Other adapters remain untested.
 - **nano-coverage-model-review · model_evaluation_saved_capture · 2026-10-01 22:24 PDT · rejected:** One actual JEV fact review selected read-pool investigation, but assigned 0.60 to dropped CAN being proven despite missing reference/drop evidence; deterministic guard rejected the full assessment. 2,344 input / 148 output tokens; reported cost $0.000098448. No raw bytes, IDs, paths, code or credentials in model state. Gap: Model fact-classification reliability remains unqualified. Rejected result is preserved; a sensible experiment choice does not validate its causal claims.
 - **nano-coverage-model-routing · model_routing_saved_capture · 2026-10-01 22:26 PDT · pass_scoped:** Default workflow now fixes evidence facts in local tooling and asks JEV only to rank authored experiments. Actual typed-choice call selected read-pool inspection (0.79), followed by receive/filter audit (0.18); prohibited claims scored zero. 2,293 input / 89 output tokens; reported cost $0.000096306. Both coverage calls combined $0.000194754. Existing key cap/expiry, daily request bound, cache and uncertain-send policy retained; no automatic test execution or live CAN control. Gap: Scores are uncalibrated. Useful routing is not accuracy, a proven read-pool cause, recovered traffic, public support or completed vehicle CAN coverage. The prior fact assessment remains rejected.
+
+### direct-beep-research-2026-10-01 · owner_only
+
+Source: `c29f0a8`. Executable SHA-256: `not recorded`.
+
+Evidence reference: owner-local: DIRECT_NANO_BEEP_2026-10-01.md.
+
+- **nano-beep-reference · bench_adapter_only · 2026-10-01 22:46 PDT · pass_scoped:** Hash-qualified SDK open, two Manager-equivalent beep calls and close returned zero. Collector retained 68 records / 3347 bytes, three matching replies and zero frame/USB bulk errors. OS serial configuration measured at 921600 baud, 8-N-1, DTR/RTS enabled; graceful stop. No CAN channel or diagnostic transmit. Gap: Vendor-dependent reference. Three unpaired incoming USB completions and three pending reads; audibility and physical cold state not observed.
+- **nano-direct-beep · bench_adapter_only · 2026-10-01 22:48 PDT · pass_scoped:** Own Windows serial sender generated framing/checksums, verified echo and Nano identity, and received both beep success markers. Zero VCX modules loaded in sender; CH343 OS driver remains. Collector retained 52 records / 2640 bytes, four matching replies and zero frame/USB bulk errors. Port closed, adapter lock released, capture graceful. Seventy Python and five actual C# encoder checks passed; no provider call or ECU transmit. Gap: Audible sound unconfirmed; two calls do not establish two sounds. Preceding vendor reference may have conditioned adapter. Five unpaired incoming USB completions and five pending reads. Cold initialization, changing prelude, CAN channel and full vehicle coverage unqualified; installed owner/public apps unchanged.
 
 ## Limits
 

@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 22:34 PDT (JEV coverage routing and read-pool comparison)",
+  "updated_pacific": "2026-10-01 22:48 PDT (direct Nano beep acknowledgments without vendor SDK)",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -76,6 +76,14 @@
       "source": "80286c1",
       "sha256": null,
       "evidence": "owner-local: CAN_COVERAGE_JEV_2026-10-01.md"
+    },
+    {
+      "id": "owner-direct-beep-research",
+      "version": "direct-beep-research-2026-10-01",
+      "audience": "owner_only",
+      "source": "c29f0a8",
+      "sha256": null,
+      "evidence": "owner-local: DIRECT_NANO_BEEP_2026-10-01.md"
     }
   ],
   "cases": [
@@ -288,6 +296,26 @@
       "result": "pass_scoped",
       "observation": "Default workflow now fixes evidence facts in local tooling and asks JEV only to rank authored experiments. Actual typed-choice call selected read-pool inspection (0.79), followed by receive/filter audit (0.18); prohibited claims scored zero. 2,293 input / 89 output tokens; reported cost $0.000096306. Both coverage calls combined $0.000194754. Existing key cap/expiry, daily request bound, cache and uncertain-send policy retained; no automatic test execution or live CAN control.",
       "gaps": "Scores are uncalibrated. Useful routing is not accuracy, a proven read-pool cause, recovered traffic, public support or completed vehicle CAN coverage. The prior fact assessment remains rejected."
+    },
+    {
+      "artifact": "owner-direct-beep-research",
+      "adapter": "vcx-nano",
+      "kind": "bench_adapter_only",
+      "result": "pass_scoped",
+      "id": "nano-beep-reference",
+      "date_pacific": "2026-10-01 22:46 PDT",
+      "observation": "Hash-qualified SDK open, two Manager-equivalent beep calls and close returned zero. Collector retained 68 records / 3347 bytes, three matching replies and zero frame/USB bulk errors. OS serial configuration measured at 921600 baud, 8-N-1, DTR/RTS enabled; graceful stop. No CAN channel or diagnostic transmit.",
+      "gaps": "Vendor-dependent reference. Three unpaired incoming USB completions and three pending reads; audibility and physical cold state not observed."
+    },
+    {
+      "artifact": "owner-direct-beep-research",
+      "adapter": "vcx-nano",
+      "kind": "bench_adapter_only",
+      "result": "pass_scoped",
+      "id": "nano-direct-beep",
+      "date_pacific": "2026-10-01 22:48 PDT",
+      "observation": "Own Windows serial sender generated framing/checksums, verified echo and Nano identity, and received both beep success markers. Zero VCX modules loaded in sender; CH343 OS driver remains. Collector retained 52 records / 2640 bytes, four matching replies and zero frame/USB bulk errors. Port closed, adapter lock released, capture graceful. Seventy Python and five actual C# encoder checks passed; no provider call or ECU transmit.",
+      "gaps": "Audible sound unconfirmed; two calls do not establish two sounds. Preceding vendor reference may have conditioned adapter. Five unpaired incoming USB completions and five pending reads. Cold initialization, changing prelude, CAN channel and full vehicle coverage unqualified; installed owner/public apps unchanged."
     }
   ],
   "adapters": [
@@ -342,9 +370,11 @@
         "nano-paired-recorder",
         "nano-coverage-tooling",
         "nano-coverage-model-review",
-        "nano-coverage-model-routing"
+        "nano-coverage-model-routing",
+        "nano-beep-reference",
+        "nano-direct-beep"
       ],
-      "next_test": "Inspect creation/completion/shutdown of the vendor receive queue locally, comparing first USB submission boundaries. Prepare capture before adapter enumeration and a separate synchronized whole-vehicle reference when hardware setup is confirmed; payload semantics and the firmware command guard remain separate pending work.",
+      "next_test": "Confirm audible outcome and documented full power removal; repeat own-transport identification/beep before vendor applications. Continue receive-pool and changing startup-prelude analysis independently, then qualify bounded own CAN channel and read-only ECM identification.",
       "completion": "Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence."
     },
     {
@@ -404,6 +434,12 @@
   ],
   "next_actions": [
     {
+      "id": "nano-direct-beep",
+      "priority": "P1",
+      "state": "done",
+      "action": "Own sender verified Nano identity and two beep success replies with no VCX library loaded; original Collector captures independently validate exchange. Audibility and cold start are still unverified."
+    },
+    {
       "id": "nano-read-pool-coverage",
       "priority": "P1",
       "state": "pending",
@@ -431,7 +467,7 @@
       "id": "nano-cold",
       "priority": "P1",
       "state": "pending",
-      "action": "Pending owner return: confirm complete Nano USB/bench power removal, then capture before Manager and perform a separately bounded firmware-handoff test. Adapter left untouched while owner is off-site."
+      "action": "Confirm complete USB/bench power removal and capture before any vendor application. First repeat own-transport identity/beep, then separately qualify diagnostic initialization; warm direct beep does not settle cold-start dependency."
     },
     {
       "id": "public-roundtrip",
