@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 19:54 PDT",
+  "updated_pacific": "2026-10-01 PDT (off-site software follow-up)",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -174,6 +174,16 @@
       "result": "pass_scoped",
       "observation": "Actual installed owner.2 picker cancellation, displayed local summary, explicit consent cancellation, cached rejected-result display and unfinished-capture rejection passed. Disabled request button remained inert. Original capture and executable hashes, provider budget and request inventory unchanged; zero new provider calls, raw uploads or vehicle commands.",
       "gaps": "Saved-capture GUI verification only. Cached rejection is not model accuracy. Category mappings provisional; return-status and ECU outcome decoding absent. Full adapter power removal and original-firmware handoff remain unqualified."
+    },
+    {
+      "id": "nano-acceptance-blindspot",
+      "artifact": "owner-002",
+      "adapter": "vcx-nano",
+      "kind": "source_review_and_synthetic",
+      "date_pacific": "2026-10-01 PDT",
+      "result": "pass_scoped",
+      "observation": "New regression proves different hypothetical command reply status bytes produce identical schema-2 category summaries; acceptance and ECU outcome remain unassessed. All 28 owner Python checks pass. Retained source review identifies separate vendor SDK return checks, without establishing wire status semantics. Test/plan commit 8d68a72; installed executable unchanged.",
+      "gaps": "This verifies the current summary limitation, not a reply-status decoder or model accuracy. Owner is off-site; adapter power state unchanged. Physical cold-start and firmware handoff remain pending."
     }
   ],
   "adapters": [
@@ -219,7 +229,8 @@
         "nano-model-rejection",
         "nano-owner-native",
         "nano-owner-gui-preflight",
-        "nano-owner-gui"
+        "nano-owner-gui",
+        "nano-acceptance-blindspot"
       ],
       "next_test": "Document complete adapter power removal; capture before Manager, followed by a separately bounded original-firmware handoff. Record exact adapter variant and firmware.",
       "completion": "GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests."
@@ -290,7 +301,7 @@
       "id": "nano-cold",
       "priority": "P1",
       "state": "pending",
-      "action": "Record full Nano power removal and initialization before Manager; then a separately bounded firmware-handoff test."
+      "action": "Pending owner return: confirm complete Nano USB/bench power removal, then capture before Manager and perform a separately bounded firmware-handoff test. Adapter left untouched while owner is off-site."
     },
     {
       "id": "public-roundtrip",
