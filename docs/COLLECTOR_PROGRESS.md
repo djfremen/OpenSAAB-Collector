@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 20:23 PDT (warm Windows firmware handoff). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-01 20:58 PDT (JEV routing and live SDK boundary traces). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -28,11 +28,11 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`.
 
-Next test: Review NAO 9.250 diagnostic data-definition semantics before narrowly extending the read-only policy; separately qualify engine information and DTC reading. Full adapter power removal remains pending.
+Next test: Locally trace generation, transport wrapping and reply validation inside the three now-mapped validity SDK calls; preserve vendor checks. Separately review the firmware data-definition guard and test physical cold start when the owner returns.
 
-Complete when: GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests.
+Complete when: Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.
 
 ### Mongoose (exact model pending)
 
@@ -60,12 +60,13 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 
 ## Next actions
 
+- **P1 · pending · nano-validity-semantics:** Two live traces map all five opaque exchanges to three successful SDK validity calls. Determine local input construction and reply validation within those boundaries; do not blindly replay the varying payloads.
 - **P1 · done · owner-gui:** Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command.
 - **P1 · pending · nano-firmware-policy:** Warm firmware startup and positive ECM VIN verified; engine entry blocked by local read-only command policy. Review data-definition semantics before any policy extension and separately test ECM information/DTC.
 - **P1 · pending · nano-cold:** Pending owner return: confirm complete Nano USB/bench power removal, then capture before Manager and perform a separately bounded firmware-handoff test. Adapter left untouched while owner is off-site.
 - **P1 · pending · public-roundtrip:** Qualify the public 0.5.3 live Chipsoft capture/review/sanitized-upload/read-back path.
 - **P2 · pending · adapter-onboarding:** Collect exact-model Windows/driver/firmware profiles for Mongoose, MDI and other adapters; keep statuses untested until evidence exists.
-- **P2 · pending · model-corpus:** Add labelled failures and missing-evidence cases before expanding model advice or public access.
+- **P2 · pending · model-corpus:** Structured JEV fact assessment remains rejected; bounded off-site experiment routing succeeded once. Build labelled failure/missing-evidence corpus before claiming accuracy or exposing public advice.
 
 ## Evidence by exact artifact
 
@@ -124,6 +125,16 @@ Evidence reference: owner-local: WINDOWS_OWNER_CATEGORY_RECEIPT_2026-10-01.json.
 - **nano-owner-gui · installed_gui_saved_capture · 2026-10-01 19:54 PDT · pass_scoped:** Actual installed owner.2 picker cancellation, displayed local summary, explicit consent cancellation, cached rejected-result display and unfinished-capture rejection passed. Disabled request button remained inert. Original capture and executable hashes, provider budget and request inventory unchanged; zero new provider calls, raw uploads or vehicle commands. Gap: Saved-capture GUI verification only. Cached rejection is not model accuracy. Category mappings provisional; return-status and ECU outcome decoding absent. Full adapter power removal and original-firmware handoff remain unqualified.
 - **nano-acceptance-blindspot · source_review_and_synthetic · 2026-10-01 PDT · pass_scoped:** New regression proves different hypothetical command reply status bytes produce identical schema-2 category summaries; acceptance and ECU outcome remain unassessed. All 28 owner Python checks pass. Retained source review identifies separate vendor SDK return checks, without establishing wire status semantics. Test/plan commit 8d68a72; installed executable unchanged. Gap: This verifies the current summary limitation, not a reply-status decoder or model accuracy. Owner is off-site; adapter power state unchanged. Physical cold-start and firmware handoff remain pending.
 - **nano-warm-firmware-handoff · bench_gui_and_independent_wire · 2026-10-01 20:19–20:23 PDT · pass_scoped:** Exact private Windows 0.2.16 candidate reached original SAAB NAO 9.250 Welcome/Main Menu, accepted arrow/Enter navigation and selected the 2004 NG 9-3 profile. Fresh launcher VIN and a separate positive ECM VIN exchange inside firmware independently matched the saved observation. Firmware showed key-position OK, then its data-definition command was stopped by the local read-only policy before transmission. Owner.2 capture: 6,628 packets, zero truncation/frame errors/USB bulk errors. Driver cleanup, released exclusive lock, cleared display and graceful capture stop verified; no forced termination, provider call or upload. Adapter-reported firmware 1.9.4.2; x86 driver 0.4.0.4. Gap: Engine entry did not complete; ECM information and DTC reading unqualified. Ten incoming completions lack matching submissions and ten reads remain pending at stop. Warm bench only; owner-reported ECM identity, exact adapter variant and full power removal unverified. No public Nano support or model accuracy qualification.
+- **nano-validity-live-trace · bench_instrumentation_and_independent_usb · 2026-10-01 20:54–20:55 PDT · pass_scoped:** Two fresh owner.2 channel-only captures correlate observed SDK entry/exit with USB: ordinal 23 contains A0 then 84; ordinal 50 contains A0 then A1; ordinal 51 contains A2; CAN open follows. All three SDK returns and channel open return zero. Existing Frida 17.11.0 records no arguments/buffers and does not change returns. Each capture: 108 packets, 13 matched headers, zero frame/USB bulk errors; connect, disconnect, close, released adapter lock and graceful Collector stop verified. Exact Collector/driver/SDK hashes rechecked. No diagnostic transmit API, provider request or raw upload during tracing. Gap: Warm bench only. Ten unmatched incoming completions and ten pending reads per recording. Millisecond correlation maps call boundaries, not payload semantics or wire return-status decoding. First file invocation was blocked before collection; normal permitted command invocation then succeeded without policy change. Physical cold start and full diagnostics remain unqualified.
+
+### research-2026-10-01 · owner_only
+
+Source: `7b686fe`. Executable SHA-256: `not recorded`.
+
+Evidence reference: owner-local: STARTUP_STRUCTURE_JEV_2026-10-01.md.
+
+- **nano-jev-structure · model_evaluation_saved_capture · 2026-10-01 20:48 PDT · rejected:** Compared six startup sequences across six stopped recordings; order and lengths repeat, but every request body differs. New allowlisted schema exports structure and equality counts, with reviewed static/bench facts. One actual JEV call used 2,894 input / 180 output tokens and reported $0.000121548; four evidence guards conflicted, so the assessment was rejected. No raw payload, identifier, capture hash, vendor code or credential was sent. Gap: Pre-trace baseline only; exact payload semantics and cold-start state unresolved. Numeric model scores are not calibrated here. Existing installed Collector and loopback upload schema unchanged.
+- **nano-jev-priority · model_routing_and_synthetic · 2026-10-01 20:51 PDT · pass_scoped:** One actual typed-choice JEV request selected local validity-boundary tracing as the next feasible off-site experiment. Returned score 0.99 for tracing and 0.01 for beep investigation; no prohibited replay/support declaration selected. 1,623 input / 78 output tokens; reported cost $0.000068166. Forty-one owner tests passed for bounds, privacy rejection, caches, uncertainty and prohibited choices. Shared request budget/cache retained. Gap: Successful bounded routing is advisory, not protocol discovery or model accuracy qualification. Initial structured-fact assessment remains rejected. No public JEV release or automatic model control of CAN.
 
 ## Limits
 

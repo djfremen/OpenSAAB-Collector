@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 20:23 PDT (warm Windows firmware handoff)",
+  "updated_pacific": "2026-10-01 20:58 PDT (JEV routing and live SDK boundary traces)",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -52,6 +52,14 @@
       "source": "593dcc0",
       "sha256": "f8dce6be96b7bca5256b1b0395ecadae04ac340a6e0aa7436a51569a5c4fe814",
       "evidence": "owner-local: WINDOWS_OWNER_CATEGORY_RECEIPT_2026-10-01.json"
+    },
+    {
+      "id": "owner-startup-research",
+      "version": "research-2026-10-01",
+      "audience": "owner_only",
+      "source": "7b686fe",
+      "sha256": null,
+      "evidence": "owner-local: STARTUP_STRUCTURE_JEV_2026-10-01.md"
     }
   ],
   "cases": [
@@ -194,6 +202,36 @@
       "result": "pass_scoped",
       "observation": "Exact private Windows 0.2.16 candidate reached original SAAB NAO 9.250 Welcome/Main Menu, accepted arrow/Enter navigation and selected the 2004 NG 9-3 profile. Fresh launcher VIN and a separate positive ECM VIN exchange inside firmware independently matched the saved observation. Firmware showed key-position OK, then its data-definition command was stopped by the local read-only policy before transmission. Owner.2 capture: 6,628 packets, zero truncation/frame errors/USB bulk errors. Driver cleanup, released exclusive lock, cleared display and graceful capture stop verified; no forced termination, provider call or upload. Adapter-reported firmware 1.9.4.2; x86 driver 0.4.0.4.",
       "gaps": "Engine entry did not complete; ECM information and DTC reading unqualified. Ten incoming completions lack matching submissions and ten reads remain pending at stop. Warm bench only; owner-reported ECM identity, exact adapter variant and full power removal unverified. No public Nano support or model accuracy qualification."
+    },
+    {
+      "id": "nano-jev-structure",
+      "artifact": "owner-startup-research",
+      "adapter": "vcx-nano",
+      "kind": "model_evaluation_saved_capture",
+      "date_pacific": "2026-10-01 20:48 PDT",
+      "result": "rejected",
+      "observation": "Compared six startup sequences across six stopped recordings; order and lengths repeat, but every request body differs. New allowlisted schema exports structure and equality counts, with reviewed static/bench facts. One actual JEV call used 2,894 input / 180 output tokens and reported $0.000121548; four evidence guards conflicted, so the assessment was rejected. No raw payload, identifier, capture hash, vendor code or credential was sent.",
+      "gaps": "Pre-trace baseline only; exact payload semantics and cold-start state unresolved. Numeric model scores are not calibrated here. Existing installed Collector and loopback upload schema unchanged."
+    },
+    {
+      "id": "nano-jev-priority",
+      "artifact": "owner-startup-research",
+      "adapter": "vcx-nano",
+      "kind": "model_routing_and_synthetic",
+      "date_pacific": "2026-10-01 20:51 PDT",
+      "result": "pass_scoped",
+      "observation": "One actual typed-choice JEV request selected local validity-boundary tracing as the next feasible off-site experiment. Returned score 0.99 for tracing and 0.01 for beep investigation; no prohibited replay/support declaration selected. 1,623 input / 78 output tokens; reported cost $0.000068166. Forty-one owner tests passed for bounds, privacy rejection, caches, uncertainty and prohibited choices. Shared request budget/cache retained.",
+      "gaps": "Successful bounded routing is advisory, not protocol discovery or model accuracy qualification. Initial structured-fact assessment remains rejected. No public JEV release or automatic model control of CAN."
+    },
+    {
+      "id": "nano-validity-live-trace",
+      "artifact": "owner-002",
+      "adapter": "vcx-nano",
+      "kind": "bench_instrumentation_and_independent_usb",
+      "date_pacific": "2026-10-01 20:54\u201320:55 PDT",
+      "result": "pass_scoped",
+      "observation": "Two fresh owner.2 channel-only captures correlate observed SDK entry/exit with USB: ordinal 23 contains A0 then 84; ordinal 50 contains A0 then A1; ordinal 51 contains A2; CAN open follows. All three SDK returns and channel open return zero. Existing Frida 17.11.0 records no arguments/buffers and does not change returns. Each capture: 108 packets, 13 matched headers, zero frame/USB bulk errors; connect, disconnect, close, released adapter lock and graceful Collector stop verified. Exact Collector/driver/SDK hashes rechecked. No diagnostic transmit API, provider request or raw upload during tracing.",
+      "gaps": "Warm bench only. Ten unmatched incoming completions and ten pending reads per recording. Millisecond correlation maps call boundaries, not payload semantics or wire return-status decoding. First file invocation was blocked before collection; normal permitted command invocation then succeeded without policy change. Physical cold start and full diagnostics remain unqualified."
     }
   ],
   "adapters": [
@@ -241,10 +279,13 @@
         "nano-owner-gui-preflight",
         "nano-owner-gui",
         "nano-acceptance-blindspot",
-        "nano-warm-firmware-handoff"
+        "nano-warm-firmware-handoff",
+        "nano-jev-structure",
+        "nano-jev-priority",
+        "nano-validity-live-trace"
       ],
-      "next_test": "Review NAO 9.250 diagnostic data-definition semantics before narrowly extending the read-only policy; separately qualify engine information and DTC reading. Full adapter power removal remains pending.",
-      "completion": "GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests."
+      "next_test": "Locally trace generation, transport wrapping and reply validation inside the three now-mapped validity SDK calls; preserve vendor checks. Separately review the firmware data-definition guard and test physical cold start when the owner returns.",
+      "completion": "Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence."
     },
     {
       "id": "mongoose",
@@ -303,6 +344,12 @@
   ],
   "next_actions": [
     {
+      "id": "nano-validity-semantics",
+      "priority": "P1",
+      "state": "pending",
+      "action": "Two live traces map all five opaque exchanges to three successful SDK validity calls. Determine local input construction and reply validation within those boundaries; do not blindly replay the varying payloads."
+    },
+    {
       "id": "owner-gui",
       "priority": "P1",
       "state": "done",
@@ -336,7 +383,7 @@
       "id": "model-corpus",
       "priority": "P2",
       "state": "pending",
-      "action": "Add labelled failures and missing-evidence cases before expanding model advice or public access."
+      "action": "Structured JEV fact assessment remains rejected; bounded off-site experiment routing succeeded once. Build labelled failure/missing-evidence corpus before claiming accuracy or exposing public advice."
     }
   ],
   "limits": [
