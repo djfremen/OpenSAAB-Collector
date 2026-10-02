@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 23:47 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-02 01:00 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -28,9 +28,9 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`, `nano-beep-reference`, `nano-direct-beep`, `nano-pixel-vin-channel-rejected`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`, `nano-beep-reference`, `nano-direct-beep`, `nano-pixel-vin-channel-rejected`, `nano-init-comparison`.
 
-Next test: Identify direct Android channel-open FE and cleanup-filter 96 semantics by comparing normal vendor prerequisites locally. Preserve the successful direct beep evidence and separate Windows OEM VIN result; do not replay opaque authorization payloads. Direct VIN requires a successful bounded channel, fresh positive ECU response and verified cleanup.
+Next test: Prepare direct-before-vendor / vendor / direct-after-vendor channel-only controls on the same host with Collector recording before open, exact open parameters and documented power state. Hardware relocation is not confirmed. Inspect vendor FE/96 handling and prelude generation locally; no opaque replay. A later direct VIN pass requires a fresh positive ECU reply and verified cleanup.
 
 Complete when: Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.
 
@@ -180,6 +180,14 @@ Source: `457ff8f`. Executable SHA-256: `bf223069c2cad6c8ba67ba667953f1075607a11a
 Evidence reference: owner-local: ANDROID_NANO_VIN_2026-10-01.md.
 
 - **nano-pixel-vin-channel-rejected · bench_readonly_vin_attempt · 2026-10-01 23:47 PDT · failed:** Unchanged installed shared Rust worker in separate owner binding verified echo and Nano identity. Channel open returned FE; stopped before VIN, zero diagnostic transmit. Twelve valid frames/six paired exchanges; filter removal returned 96, stop/close 00. USB closed and binding cleanup passed. Ten exclusion tests plus 17 framing checks passed, actual activity compiled. Main preview.30 unchanged; no provider request/upload. Gap: No VIN or CAN channel success. FE meaning unknown; do not infer license cause. Filter cleanup rejected, so channel cleanup is not a pass. Application recording is not USBPcap/independent CAN reference. Audible sound and independent full power removal remain unobserved. Earlier OEM Windows VIN is separate.
+
+### init-comparison-cli-1 · owner_only
+
+Source: `6ede42a`. Executable SHA-256: `not recorded`.
+
+Evidence reference: owner-local: NANO_INIT_COMPARISON_2026-10-02.md.
+
+- **nano-init-comparison · saved_recordings_and_model_routing · 2026-10-02 00:54 PDT · pass_scoped:** Four unchanged stopped recordings indexed privately: Windows vendor channel-only, vendor VIN, direct beep and Pixel direct VIN attempt. Same open parameters succeed in vendor channel-only but return FE on Pixel; vendor VIN uses a different third byte. Both vendor paths have the five-step changing prelude, Pixel does not. Corrected JEV routing chooses a same-host control; 81 owner tests pass. Two calls reported $0.000251034 total. Gap: No new hardware capture or command. Pixel source is an application log, not USBPcap; whole-bus gap counter unavailable. Initial model input had an incorrect data-header counter and is preserved as superseded; corrected result is separate. Returned scores are uncalibrated advice. Preconditions/FE semantics/cold-start causality remain unresolved; no public Nano support or model accuracy claim.
 
 ## Limits
 
