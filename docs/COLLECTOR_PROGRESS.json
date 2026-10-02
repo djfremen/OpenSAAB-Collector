@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 23:29 PDT",
+  "updated_pacific": "2026-10-01 23:47 PDT",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -92,6 +92,14 @@
       "source": "b223c43",
       "sha256": "ab1c51523c4164300350513a490d5f91ee2523ee1f298b630aa7324f5d17c496",
       "evidence": "owner-local: ANDROID_NANO_BEEP_2026-10-01.md"
+    },
+    {
+      "id": "owner-android-vin-probe",
+      "version": "android-vin-owner-0.2",
+      "audience": "owner_only",
+      "source": "457ff8f",
+      "sha256": "bf223069c2cad6c8ba67ba667953f1075607a11a41354d61318941f8a5cafc4b",
+      "evidence": "owner-local: ANDROID_NANO_VIN_2026-10-01.md"
     }
   ],
   "cases": [
@@ -334,6 +342,16 @@
       "date_pacific": "2026-10-01 23:29 PDT",
       "observation": "Separate Pixel owner probe received echo, validated Nano identity and two beep success markers through Android USB Host APIs. Four control returns zero; eight valid frames/four ordered exchanges. USB closed and cleanup passed; diagnostic transmit zero. Seventeen JVM framing checks passed, activity compiled and APK verified. Existing preview.30 preserved; no vendor libraries or provider call.",
       "gaps": "Audibility and independent full adapter power removal unobserved. Application transfer recording is not whole-bus USBPcap or CAN reference. Identity reply took 2.309 seconds against 2.5-second bound; cause/reliability unqualified. License activation, CAN channel, ECM/VIN and public support not proven."
+    },
+    {
+      "id": "nano-pixel-vin-channel-rejected",
+      "artifact": "owner-android-vin-probe",
+      "adapter": "vcx-nano",
+      "kind": "bench_readonly_vin_attempt",
+      "result": "failed",
+      "date_pacific": "2026-10-01 23:47 PDT",
+      "observation": "Unchanged installed shared Rust worker in separate owner binding verified echo and Nano identity. Channel open returned FE; stopped before VIN, zero diagnostic transmit. Twelve valid frames/six paired exchanges; filter removal returned 96, stop/close 00. USB closed and binding cleanup passed. Ten exclusion tests plus 17 framing checks passed, actual activity compiled. Main preview.30 unchanged; no provider request/upload.",
+      "gaps": "No VIN or CAN channel success. FE meaning unknown; do not infer license cause. Filter cleanup rejected, so channel cleanup is not a pass. Application recording is not USBPcap/independent CAN reference. Audible sound and independent full power removal remain unobserved. Earlier OEM Windows VIN is separate."
     }
   ],
   "adapters": [
@@ -393,7 +411,8 @@
         "nano-direct-beep"
       ],
       "next_test": "Confirm audible outcome and documented full power removal; repeat own-transport identification/beep before vendor applications. Continue receive-pool and changing startup-prelude analysis independently, then qualify bounded own CAN channel and read-only ECM identification.",
-      "completion": "Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence."
+      "completion": "Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.",
+      "next": "Identify direct Android channel-open FE and cleanup-filter 96 semantics by comparing normal vendor prerequisites locally. Preserve the successful direct beep evidence and separate Windows OEM VIN result; do not replay opaque authorization payloads. Direct VIN requires a successful bounded channel, fresh positive ECU response and verified cleanup."
     },
     {
       "id": "mongoose",

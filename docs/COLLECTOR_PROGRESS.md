@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 23:29 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-01 23:47 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -172,6 +172,14 @@ Source: `b223c43`. Executable SHA-256: `ab1c51523c4164300350513a490d5f91ee2523ee
 Evidence reference: owner-local: ANDROID_NANO_BEEP_2026-10-01.md.
 
 - **nano-pixel-direct-beep · bench_adapter_only · 2026-10-01 23:29 PDT · pass_scoped:** Separate Pixel owner probe received echo, validated Nano identity and two beep success markers through Android USB Host APIs. Four control returns zero; eight valid frames/four ordered exchanges. USB closed and cleanup passed; diagnostic transmit zero. Seventeen JVM framing checks passed, activity compiled and APK verified. Existing preview.30 preserved; no vendor libraries or provider call. Gap: Audibility and independent full adapter power removal unobserved. Application transfer recording is not whole-bus USBPcap or CAN reference. Identity reply took 2.309 seconds against 2.5-second bound; cause/reliability unqualified. License activation, CAN channel, ECM/VIN and public support not proven.
+
+### android-vin-owner-0.2 · owner_only
+
+Source: `457ff8f`. Executable SHA-256: `bf223069c2cad6c8ba67ba667953f1075607a11a41354d61318941f8a5cafc4b`.
+
+Evidence reference: owner-local: ANDROID_NANO_VIN_2026-10-01.md.
+
+- **nano-pixel-vin-channel-rejected · bench_readonly_vin_attempt · 2026-10-01 23:47 PDT · failed:** Unchanged installed shared Rust worker in separate owner binding verified echo and Nano identity. Channel open returned FE; stopped before VIN, zero diagnostic transmit. Twelve valid frames/six paired exchanges; filter removal returned 96, stop/close 00. USB closed and binding cleanup passed. Ten exclusion tests plus 17 framing checks passed, actual activity compiled. Main preview.30 unchanged; no provider request/upload. Gap: No VIN or CAN channel success. FE meaning unknown; do not infer license cause. Filter cleanup rejected, so channel cleanup is not a pass. Application recording is not USBPcap/independent CAN reference. Audible sound and independent full power removal remain unobserved. Earlier OEM Windows VIN is separate.
 
 ## Limits
 
