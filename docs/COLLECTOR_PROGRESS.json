@@ -408,11 +408,11 @@
         "nano-coverage-model-review",
         "nano-coverage-model-routing",
         "nano-beep-reference",
-        "nano-direct-beep"
+        "nano-direct-beep",
+        "nano-pixel-vin-channel-rejected"
       ],
-      "next_test": "Confirm audible outcome and documented full power removal; repeat own-transport identification/beep before vendor applications. Continue receive-pool and changing startup-prelude analysis independently, then qualify bounded own CAN channel and read-only ECM identification.",
-      "completion": "Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.",
-      "next": "Identify direct Android channel-open FE and cleanup-filter 96 semantics by comparing normal vendor prerequisites locally. Preserve the successful direct beep evidence and separate Windows OEM VIN result; do not replay opaque authorization payloads. Direct VIN requires a successful bounded channel, fresh positive ECU response and verified cleanup."
+      "next_test": "Identify direct Android channel-open FE and cleanup-filter 96 semantics by comparing normal vendor prerequisites locally. Preserve the successful direct beep evidence and separate Windows OEM VIN result; do not replay opaque authorization payloads. Direct VIN requires a successful bounded channel, fresh positive ECU response and verified cleanup.",
+      "completion": "Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence."
     },
     {
       "id": "mongoose",

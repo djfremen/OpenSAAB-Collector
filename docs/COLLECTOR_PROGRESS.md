@@ -28,9 +28,9 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`, `nano-beep-reference`, `nano-direct-beep`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`, `nano-beep-reference`, `nano-direct-beep`, `nano-pixel-vin-channel-rejected`.
 
-Next test: Confirm audible outcome and documented full power removal; repeat own-transport identification/beep before vendor applications. Continue receive-pool and changing startup-prelude analysis independently, then qualify bounded own CAN channel and read-only ECM identification.
+Next test: Identify direct Android channel-open FE and cleanup-filter 96 semantics by comparing normal vendor prerequisites locally. Preserve the successful direct beep evidence and separate Windows OEM VIN result; do not replay opaque authorization payloads. Direct VIN requires a successful bounded channel, fresh positive ECU response and verified cleanup.
 
 Complete when: Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.
 
