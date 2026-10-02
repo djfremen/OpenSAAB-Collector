@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 18:56 PDT",
+  "updated_pacific": "2026-10-01 19:16 PDT",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -154,6 +154,16 @@
       "result": "pass_scoped",
       "observation": "Installed artifact digest verified. Fifty-one existing plus 65 native category/response checks and 27 Python tests passed. Nineteen synthetic cross-language cases and the saved reboot capture matched. Native client rejected saved unsupported model assessment; zero new model requests or vehicle commands. Public-mode build excludes owner classes.",
       "gaps": "GUI button walk-through pending Mini unlock. Categories remain provisional; command return status and ECU outcome decoding absent. Original capture unchanged; analysis does not sanitize it."
+    },
+    {
+      "id": "nano-owner-gui-preflight",
+      "artifact": "owner-002",
+      "adapter": "vcx-nano",
+      "kind": "installed_cli_preflight",
+      "date_pacific": "2026-10-01 19:16 PDT",
+      "result": "pass_scoped",
+      "observation": "Mini UI unlocked and SSH reachable. Installed owner.2 digest verified; actual analyzer reproduced saved capture summary and rejected a recording-state fixture. Exact summary has a complete cached rejected JEV result, so a later GUI check can avoid a new model call. Installed x86 VXDIAG / ALLScanner VCXPT32.dll file version 0.4.0.4 recorded. No new model request, vehicle command or raw upload.",
+      "gaps": "EliteBook remains at Windows password screen. Folder selection, visible summary, cancellation and cached-result GUI checks remain untested. Adapter firmware and exact Nano variant remain unknown."
     }
   ],
   "adapters": [
@@ -180,7 +190,7 @@
     {
       "id": "vcx-nano",
       "name": "VCX Nano (exact variant pending)",
-      "platform": "Windows 10 x64 / EliteBook; owner bench",
+      "platform": "Windows 10 x64 / EliteBook; x86 VXDIAG driver 0.4.0.4; owner bench",
       "public_stages": {
         "capture": "not_tested",
         "stop": "not_tested",
@@ -197,9 +207,10 @@
         "nano-warm-vin",
         "nano-owner-reboot",
         "nano-model-rejection",
-        "nano-owner-native"
+        "nano-owner-native",
+        "nano-owner-gui-preflight"
       ],
-      "next_test": "Verify installed owner.2 analysis screens, then document complete adapter power removal and capture startup before Manager; separately bound original-firmware handoff. Record exact variant/driver/firmware.",
+      "next_test": "Sign in to Windows and verify owner.2 analysis screens with the existing cached rejected result; then document full adapter power removal and capture before Manager, followed by a separately bounded firmware handoff. Record exact adapter variant and firmware.",
       "completion": "GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests."
     },
     {
@@ -262,7 +273,7 @@
       "id": "owner-gui",
       "priority": "P1",
       "state": "pending",
-      "action": "Verify owner.2 folder picker, summary, separate model consent and rejected-result screens after Mini unlock."
+      "action": "Windows sign-in is required; then verify owner.2 picker, local summary, consent cancellation, cached rejected result and incomplete-capture handling. Mini is now unlocked."
     },
     {
       "id": "nano-cold",
