@@ -1,0 +1,300 @@
+{
+  "schema": 1,
+  "updated_pacific": "2026-10-01 18:56 PDT",
+  "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
+  "public_version": "0.5.3-preview.1",
+  "owner_version": "0.5.4-owner.2",
+  "artifacts": [
+    {
+      "id": "public-050",
+      "version": "0.5.0-preview.1",
+      "audience": "public",
+      "source": "9de8bdb",
+      "sha256": "6c4bd3ac120f9d11a4082d63554535f7995d9d5eae3ebda8393d87478fa94e11",
+      "evidence": "docs/AUTOMATED_COLLECTOR_2026-09-23.md"
+    },
+    {
+      "id": "public-051",
+      "version": "0.5.1-preview.1",
+      "audience": "public",
+      "source": null,
+      "sha256": null,
+      "evidence": "docs/BRANDING_0.5.1.md"
+    },
+    {
+      "id": "public-052",
+      "version": "0.5.2-preview.1",
+      "audience": "public",
+      "source": "6aec99cb83ea6fd4f9c9ad213ab79243d86b04d7",
+      "sha256": "b7d13ec9526bafd1a236f5bce6ebf5997f4b847f8f2410e75fbc42eb8b6a61f3",
+      "evidence": "docs/REVIEW_UPLOAD_0.5.2.md"
+    },
+    {
+      "id": "public-053",
+      "version": "0.5.3-preview.1",
+      "audience": "public",
+      "source": "4a335c33ad3af2805314ae3949487330b9069397",
+      "sha256": "9bc988afeac4c41524ac46da5e6a6661cb47e9e683b4fc5da142b69a1200e31a",
+      "evidence": "docs/SANITIZE_REVIEW_0.5.3.md"
+    },
+    {
+      "id": "owner-001",
+      "version": "0.5.4-owner.1",
+      "audience": "owner_only",
+      "source": null,
+      "sha256": "930798ad926ab79ef963ca8a8639359c9b577d021e081f8fc5c2c43d625d3974",
+      "evidence": "owner-local: Nano bench and reboot receipts, October 1"
+    },
+    {
+      "id": "owner-002",
+      "version": "0.5.4-owner.2",
+      "audience": "owner_only",
+      "source": "593dcc0",
+      "sha256": "f8dce6be96b7bca5256b1b0395ecadae04ac340a6e0aa7436a51569a5c4fe814",
+      "evidence": "owner-local: WINDOWS_OWNER_CATEGORY_RECEIPT_2026-10-01.json"
+    }
+  ],
+  "cases": [
+    {
+      "id": "chipsoft-050-bench",
+      "artifact": "public-050",
+      "adapter": "chipsoft-pro",
+      "kind": "bench",
+      "date_pacific": "2026-09-23 / release September 23 PDT",
+      "result": "pass_scoped",
+      "observation": "Windows 10 x64 EliteBook: real capture stopped gracefully; 468 records, zero truncation. Separate read-only probe read six DTC records. Public HTTPS upload receipt and private storage read-back verified. Separate GUI recording had 474 records and retained local files. Collector itself sent no diagnostic commands.",
+      "gaps": "Driver and firmware versions not recorded here. USBPcap was already installed; clean driver installation/reboot remains untested."
+    },
+    {
+      "id": "branding-051",
+      "artifact": "public-051",
+      "adapter": null,
+      "kind": "ui",
+      "date_pacific": "2026-09-23 PDT",
+      "result": "pass_scoped",
+      "observation": "Branding, icon and voluntary Donate action checked on Windows 10 EliteBook.",
+      "gaps": "No fresh live capture/upload on this exact artifact. Source revision and executable digest need backfill from release evidence."
+    },
+    {
+      "id": "review-052",
+      "artifact": "public-052",
+      "adapter": null,
+      "kind": "synthetic_ui",
+      "date_pacific": "2026-09-24 PDT",
+      "result": "pass_scoped",
+      "observation": "Twelve synthetic bundle checks and review/upload UI verified on Windows 10 EliteBook; stop saves locally and explicit upload rebuilds current files.",
+      "gaps": "No fresh live capture/review/upload round-trip on 0.5.2."
+    },
+    {
+      "id": "sanitize-053",
+      "artifact": "public-053",
+      "adapter": null,
+      "kind": "synthetic_ui_ci",
+      "date_pacific": "2026-09-25 PDT",
+      "result": "pass_scoped",
+      "observation": "Exact release digest verified on Windows 10 EliteBook. Thirty-five native assertions, UI counts/options/report/upload confirmation, and ten CI server tests passed. Confirmation cancelled; no test capture uploaded.",
+      "gaps": "No live capture-to-sanitized-upload round-trip on 0.5.3. Limited contiguous-text sanitizer can miss identifiers and security payloads; edited data is unsuitable for replay."
+    },
+    {
+      "id": "nano-channel-only",
+      "artifact": "owner-001",
+      "adapter": "vcx-nano",
+      "kind": "bench",
+      "date_pacific": "2026-10-01 16:59 PDT",
+      "result": "pass_scoped",
+      "observation": "Channel-only vendor path captured 122 records, 27 paired bulk transfers and 13 matched headers, zero frame errors and ten pending polling reads; graceful stop. No ECU diagnostic transmit calls. Earlier descriptor-only recordings did not establish payload capture.",
+      "gaps": "Owner-reported adapter reboot did not establish complete power removal. First Manager comparison failed launch/preflight and SSH access; no diagnostic or license qualification."
+    },
+    {
+      "id": "nano-manager-startup",
+      "artifact": "owner-001",
+      "adapter": "vcx-nano",
+      "kind": "bench",
+      "date_pacific": "2026-10-01 17:11 PDT (stop)",
+      "result": "pass_scoped",
+      "observation": "Recovered Manager launch without reinstall or firmware/license changes. Startup capture: 192 records, 63 paired bulk transfers, six matched headers, zero frame errors, ten pending reads; graceful stop. No beep command observed.",
+      "gaps": "License indicator changes not assessed. Opaque startup operations unresolved; matched headers do not establish authorization or ECU success."
+    },
+    {
+      "id": "nano-warm-vin",
+      "artifact": "owner-001",
+      "adapter": "vcx-nano",
+      "kind": "bench",
+      "date_pacific": "2026-10-01 17:12 PDT",
+      "result": "pass_scoped",
+      "observation": "Installed Windows 0.2.14 VIN-only helper and independent wire check agree on one positive bench VIN reply. Capture: 184 records, 30 paired bulk transfers, 19 matched headers, zero frame errors; cleanup and graceful stop verified. Nine synthetic research-decoder tests passed.",
+      "gaps": "Ten incoming completions lacked matching submissions; ten polling reads pending at stop. Owner-reported ECM model and power removal unverified. No full GUI/firmware handoff, security access or public Nano support."
+    },
+    {
+      "id": "nano-owner-reboot",
+      "artifact": "owner-001",
+      "adapter": "vcx-nano",
+      "kind": "bench",
+      "date_pacific": "2026-10-01 18:12 PDT",
+      "result": "pass_scoped",
+      "observation": "Fresh Windows reboot independently established. Manager absent during capture. Candidate assembly methods produced one matching positive bench VIN exchange and cleanup. Capture: 198 records, 40 paired bulk transfers, 19 matched headers, zero frame errors, ten pending polling reads at stop.",
+      "gaps": "Headless candidate route, not full emulator handoff. Adapter power removal and boot enumeration not captured; ECM model is owner reported. Driver, firmware and exact Nano variant remain unrecorded in this register."
+    },
+    {
+      "id": "nano-model-rejection",
+      "artifact": "owner-001",
+      "adapter": "vcx-nano",
+      "kind": "model_evaluation",
+      "date_pacific": "2026-10-01 PDT",
+      "result": "rejected",
+      "observation": "One counts-only JEV call inferred unsupported ECU success, Manager dependency and full diagnostics. Whole assessment rejected. Local VIN wire evidence is assessed separately.",
+      "gaps": "No accuracy qualification. Scores are not calibrated probabilities; labelled success/failure/missing-evidence corpus remains pending."
+    },
+    {
+      "id": "nano-owner-native",
+      "artifact": "owner-002",
+      "adapter": "vcx-nano",
+      "kind": "synthetic_and_saved_capture",
+      "date_pacific": "2026-10-01 18:47 PDT",
+      "result": "pass_scoped",
+      "observation": "Installed artifact digest verified. Fifty-one existing plus 65 native category/response checks and 27 Python tests passed. Nineteen synthetic cross-language cases and the saved reboot capture matched. Native client rejected saved unsupported model assessment; zero new model requests or vehicle commands. Public-mode build excludes owner classes.",
+      "gaps": "GUI button walk-through pending Mini unlock. Categories remain provisional; command return status and ECU outcome decoding absent. Original capture unchanged; analysis does not sanitize it."
+    }
+  ],
+  "adapters": [
+    {
+      "id": "chipsoft-pro",
+      "name": "Chipsoft Pro",
+      "platform": "Windows 10 x64 / EliteBook",
+      "public_stages": {
+        "capture": "historical_pass",
+        "stop": "historical_pass",
+        "review_sanitize": "not_tested",
+        "upload_readback": "historical_pass"
+      },
+      "owner_stages": {
+        "local_decode": "not_tested",
+        "model_advice": "not_tested"
+      },
+      "evidence": [
+        "chipsoft-050-bench"
+      ],
+      "next_test": "Run a fresh 0.5.3 initialization, VIN and read-only DTC capture; stop, optionally sanitize a copy, review, explicitly upload and independently verify stored bytes. Record driver and adapter firmware.",
+      "completion": "Exact 0.5.3 digest, selected-device traffic, graceful cleanup, original preservation, matching receipt/read-back and private evidence; no claim of every module working."
+    },
+    {
+      "id": "vcx-nano",
+      "name": "VCX Nano (exact variant pending)",
+      "platform": "Windows 10 x64 / EliteBook; owner bench",
+      "public_stages": {
+        "capture": "not_tested",
+        "stop": "not_tested",
+        "review_sanitize": "not_tested",
+        "upload_readback": "not_tested"
+      },
+      "owner_stages": {
+        "local_decode": "pass_scoped",
+        "model_advice": "rejected"
+      },
+      "evidence": [
+        "nano-channel-only",
+        "nano-manager-startup",
+        "nano-warm-vin",
+        "nano-owner-reboot",
+        "nano-model-rejection",
+        "nano-owner-native"
+      ],
+      "next_test": "Verify installed owner.2 analysis screens, then document complete adapter power removal and capture startup before Manager; separately bound original-firmware handoff. Record exact variant/driver/firmware.",
+      "completion": "GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests."
+    },
+    {
+      "id": "mongoose",
+      "name": "Mongoose (exact model pending)",
+      "platform": "Windows 8.1 planned; not tested",
+      "public_stages": {
+        "capture": "not_tested",
+        "stop": "not_tested",
+        "review_sanitize": "not_tested",
+        "upload_readback": "not_tested"
+      },
+      "owner_stages": {
+        "local_decode": "not_tested",
+        "model_advice": "not_tested"
+      },
+      "evidence": [],
+      "next_test": "First check Windows 8.1 dependencies and USBPcap installation/reboot with the exact model and vendor driver; collect a short working-vendor-session recording.",
+      "completion": "Exact build/model/driver/firmware evidence for selection, payload capture, graceful stop, review and confirmed private upload/read-back."
+    },
+    {
+      "id": "gm-mdi",
+      "name": "GM MDI / MDI 2",
+      "platform": "Windows USB profile planned; not tested",
+      "public_stages": {
+        "capture": "not_tested",
+        "stop": "not_tested",
+        "review_sanitize": "not_tested",
+        "upload_readback": "not_tested"
+      },
+      "owner_stages": {
+        "local_decode": "not_tested",
+        "model_advice": "not_tested"
+      },
+      "evidence": [],
+      "next_test": "Create separate MDI and MDI 2 USB profiles with driver/firmware versions and a known working vendor session. Do not apply Nano categories to their packets.",
+      "completion": "Independent per-model capture/stop/review/upload evidence. Network operation requires a separate capture method."
+    },
+    {
+      "id": "other-usb",
+      "name": "Other USB adapters",
+      "platform": "Case-by-case qualification",
+      "public_stages": {
+        "capture": "not_tested",
+        "stop": "not_tested",
+        "review_sanitize": "not_tested",
+        "upload_readback": "not_tested"
+      },
+      "owner_stages": {
+        "local_decode": "not_tested",
+        "model_advice": "not_tested"
+      },
+      "evidence": [],
+      "next_test": "Add an exact-model profile before recording; check existing vendor driver, USB address and actual payloads. Start with identification/read-only diagnostics.",
+      "completion": "Each model needs an exact-artifact case. A generic USB capture capability does not establish every adapter or an OpenSAAB diagnostic backend."
+    }
+  ],
+  "next_actions": [
+    {
+      "id": "owner-gui",
+      "priority": "P1",
+      "state": "pending",
+      "action": "Verify owner.2 folder picker, summary, separate model consent and rejected-result screens after Mini unlock."
+    },
+    {
+      "id": "nano-cold",
+      "priority": "P1",
+      "state": "pending",
+      "action": "Record full Nano power removal and initialization before Manager; then a separately bounded firmware-handoff test."
+    },
+    {
+      "id": "public-roundtrip",
+      "priority": "P1",
+      "state": "pending",
+      "action": "Qualify the public 0.5.3 live Chipsoft capture/review/sanitized-upload/read-back path."
+    },
+    {
+      "id": "adapter-onboarding",
+      "priority": "P2",
+      "state": "pending",
+      "action": "Collect exact-model Windows/driver/firmware profiles for Mongoose, MDI and other adapters; keep statuses untested until evidence exists."
+    },
+    {
+      "id": "model-corpus",
+      "priority": "P2",
+      "state": "pending",
+      "action": "Add labelled failures and missing-evidence cases before expanding model advice or public access."
+    }
+  ],
+  "limits": [
+    "Capture, diagnostic communication, sanitizer coverage, upload storage and model accuracy are separate qualifications.",
+    "Public 0.5.3 has no JEV feature. Owner.2 is private research; its bridge needs the Mini and SSH tunnel. No model controls the adapter or CAN loop.",
+    "USBPcap captures USB traffic only. Bluetooth and network paths require other capture mechanisms.",
+    "No raw captures, VINs, seeds, credentials, contact details, notes or device serials belong in this register or dashboard. Private receipts and payload evidence stay private.",
+    "No field-user success is claimed by these bench and synthetic tests. Capture totals are not people, unique cars or full diagnostic success.",
+    "Historical shim/native-log implementations remain archived and are not features of the current public USBPcap application."
+  ]
+}

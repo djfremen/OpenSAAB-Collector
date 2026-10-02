@@ -23,10 +23,13 @@ other encodings and security exchanges may remain. See the
 [review instructions](desktop/README.md#review-before-upload).
 No Cloudflare passwords or storage keys are in the app.
 
-**Validation:** Windows 10 / Chipsoft Pro capture and private R2 round-trip tested.
-Windows 8.1 / Mongoose remains to be tested. See the
-[current checkpoint](docs/AUTOMATED_COLLECTOR_2026-09-23.md) for deployment and UI
-walkthrough status. The first public 0.5 build is a preview.
+**Validation:** Windows 10 / Chipsoft Pro capture and private R2 round-trip were
+tested on 0.5.0. Public 0.5.3 has exact-executable synthetic and UI checks; a new
+live capture-to-sanitized-upload round-trip remains pending. Windows 8.1 /
+Mongoose remains untested. The maintained [Collector progress matrix](docs/COLLECTOR_PROGRESS.md)
+tracks each adapter, exact build, evidence, gaps and next test. Owner-only Nano
+research is recorded separately from public features. See the
+[0.5.0 checkpoint](docs/AUTOMATED_COLLECTOR_2026-09-23.md) for earlier deployment evidence.
 
 - [Contributor instructions](desktop/README.md)
 - [Capture privacy notice](docs/CAPTURE_PRIVACY.md)
