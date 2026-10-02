@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 22:48 PDT (direct Nano beep acknowledgments without vendor SDK). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-01 23:29 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -164,6 +164,14 @@ Evidence reference: owner-local: DIRECT_NANO_BEEP_2026-10-01.md.
 
 - **nano-beep-reference · bench_adapter_only · 2026-10-01 22:46 PDT · pass_scoped:** Hash-qualified SDK open, two Manager-equivalent beep calls and close returned zero. Collector retained 68 records / 3347 bytes, three matching replies and zero frame/USB bulk errors. OS serial configuration measured at 921600 baud, 8-N-1, DTR/RTS enabled; graceful stop. No CAN channel or diagnostic transmit. Gap: Vendor-dependent reference. Three unpaired incoming USB completions and three pending reads; audibility and physical cold state not observed.
 - **nano-direct-beep · bench_adapter_only · 2026-10-01 22:48 PDT · pass_scoped:** Own Windows serial sender generated framing/checksums, verified echo and Nano identity, and received both beep success markers. Zero VCX modules loaded in sender; CH343 OS driver remains. Collector retained 52 records / 2640 bytes, four matching replies and zero frame/USB bulk errors. Port closed, adapter lock released, capture graceful. Seventy Python and five actual C# encoder checks passed; no provider call or ECU transmit. Gap: Audible sound unconfirmed; two calls do not establish two sounds. Preceding vendor reference may have conditioned adapter. Five unpaired incoming USB completions and five pending reads. Cold initialization, changing prelude, CAN channel and full vehicle coverage unqualified; installed owner/public apps unchanged.
+
+### android-beep-owner-0.1 · owner_only
+
+Source: `b223c43`. Executable SHA-256: `ab1c51523c4164300350513a490d5f91ee2523ee1f298b630aa7324f5d17c496`.
+
+Evidence reference: owner-local: ANDROID_NANO_BEEP_2026-10-01.md.
+
+- **nano-pixel-direct-beep · bench_adapter_only · 2026-10-01 23:29 PDT · pass_scoped:** Separate Pixel owner probe received echo, validated Nano identity and two beep success markers through Android USB Host APIs. Four control returns zero; eight valid frames/four ordered exchanges. USB closed and cleanup passed; diagnostic transmit zero. Seventeen JVM framing checks passed, activity compiled and APK verified. Existing preview.30 preserved; no vendor libraries or provider call. Gap: Audibility and independent full adapter power removal unobserved. Application transfer recording is not whole-bus USBPcap or CAN reference. Identity reply took 2.309 seconds against 2.5-second bound; cause/reliability unqualified. License activation, CAN channel, ECM/VIN and public support not proven.
 
 ## Limits
 

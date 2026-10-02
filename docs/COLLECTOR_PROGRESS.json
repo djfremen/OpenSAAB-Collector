@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 22:48 PDT (direct Nano beep acknowledgments without vendor SDK)",
+  "updated_pacific": "2026-10-01 23:29 PDT",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -84,6 +84,14 @@
       "source": "c29f0a8",
       "sha256": null,
       "evidence": "owner-local: DIRECT_NANO_BEEP_2026-10-01.md"
+    },
+    {
+      "id": "owner-android-beep-probe",
+      "version": "android-beep-owner-0.1",
+      "audience": "owner_only",
+      "source": "b223c43",
+      "sha256": "ab1c51523c4164300350513a490d5f91ee2523ee1f298b630aa7324f5d17c496",
+      "evidence": "owner-local: ANDROID_NANO_BEEP_2026-10-01.md"
     }
   ],
   "cases": [
@@ -316,6 +324,16 @@
       "date_pacific": "2026-10-01 22:48 PDT",
       "observation": "Own Windows serial sender generated framing/checksums, verified echo and Nano identity, and received both beep success markers. Zero VCX modules loaded in sender; CH343 OS driver remains. Collector retained 52 records / 2640 bytes, four matching replies and zero frame/USB bulk errors. Port closed, adapter lock released, capture graceful. Seventy Python and five actual C# encoder checks passed; no provider call or ECU transmit.",
       "gaps": "Audible sound unconfirmed; two calls do not establish two sounds. Preceding vendor reference may have conditioned adapter. Five unpaired incoming USB completions and five pending reads. Cold initialization, changing prelude, CAN channel and full vehicle coverage unqualified; installed owner/public apps unchanged."
+    },
+    {
+      "id": "nano-pixel-direct-beep",
+      "artifact": "owner-android-beep-probe",
+      "adapter": "vcx-nano",
+      "kind": "bench_adapter_only",
+      "result": "pass_scoped",
+      "date_pacific": "2026-10-01 23:29 PDT",
+      "observation": "Separate Pixel owner probe received echo, validated Nano identity and two beep success markers through Android USB Host APIs. Four control returns zero; eight valid frames/four ordered exchanges. USB closed and cleanup passed; diagnostic transmit zero. Seventeen JVM framing checks passed, activity compiled and APK verified. Existing preview.30 preserved; no vendor libraries or provider call.",
+      "gaps": "Audibility and independent full adapter power removal unobserved. Application transfer recording is not whole-bus USBPcap or CAN reference. Identity reply took 2.309 seconds against 2.5-second bound; cause/reliability unqualified. License activation, CAN channel, ECM/VIN and public support not proven."
     }
   ],
   "adapters": [
