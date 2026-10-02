@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 20:58 PDT (JEV routing and live SDK boundary traces). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-01 21:42 PDT (paired USB / SDK recorder tested). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -28,9 +28,9 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`.
 
-Next test: Locally trace generation, transport wrapping and reply validation inside the three now-mapped validity SDK calls; preserve vendor checks. Separately review the firmware data-definition guard and test physical cold start when the owner returns.
+Next test: Use paired Collector USB and SDK recording to trace a reviewed lower transport boundary inside the mapped validity calls; exported send/receive functions were not observed there. Separately review the firmware data-definition guard and test physical cold start when the owner returns.
 
 Complete when: Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.
 
@@ -60,7 +60,7 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 
 ## Next actions
 
-- **P1 · pending · nano-validity-semantics:** Two live traces map all five opaque exchanges to three successful SDK validity calls. Determine local input construction and reply validation within those boundaries; do not blindly replay the varying payloads.
+- **P1 · pending · nano-validity-semantics:** Reusable paired USB/SDK recorder repeats all five startup exchanges inside three successful validity calls. Twenty-five export hooks reveal no send/receive-export event inside them; next locate a reviewed lower transport boundary and determine input/reply handling without changing vendor checks.
 - **P1 · done · owner-gui:** Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command.
 - **P1 · pending · nano-firmware-policy:** Warm firmware startup and positive ECM VIN verified; engine entry blocked by local read-only command policy. Review data-definition semantics before any policy extension and separately test ECM information/DTC.
 - **P1 · pending · nano-cold:** Pending owner return: confirm complete Nano USB/bench power removal, then capture before Manager and perform a separately bounded firmware-handoff test. Adapter left untouched while owner is off-site.
@@ -135,6 +135,14 @@ Evidence reference: owner-local: STARTUP_STRUCTURE_JEV_2026-10-01.md.
 
 - **nano-jev-structure · model_evaluation_saved_capture · 2026-10-01 20:48 PDT · rejected:** Compared six startup sequences across six stopped recordings; order and lengths repeat, but every request body differs. New allowlisted schema exports structure and equality counts, with reviewed static/bench facts. One actual JEV call used 2,894 input / 180 output tokens and reported $0.000121548; four evidence guards conflicted, so the assessment was rejected. No raw payload, identifier, capture hash, vendor code or credential was sent. Gap: Pre-trace baseline only; exact payload semantics and cold-start state unresolved. Numeric model scores are not calibrated here. Existing installed Collector and loopback upload schema unchanged.
 - **nano-jev-priority · model_routing_and_synthetic · 2026-10-01 20:51 PDT · pass_scoped:** One actual typed-choice JEV request selected local validity-boundary tracing as the next feasible off-site experiment. Returned score 0.99 for tracing and 0.01 for beep investigation; no prohibited replay/support declaration selected. 1,623 input / 78 output tokens; reported cost $0.000068166. Forty-one owner tests passed for bounds, privacy rejection, caches, uncertainty and prohibited choices. Shared request budget/cache retained. Gap: Successful bounded routing is advisory, not protocol discovery or model accuracy qualification. Initial structured-fact assessment remains rejected. No public JEV release or automatic model control of CAN.
+
+### paired-research-2026-10-01 · owner_only
+
+Source: `6e04d35`. Executable SHA-256: `not recorded`.
+
+Evidence reference: owner-local: PAIRED_USB_SDK_FINDINGS_2026-10-01.md.
+
+- **nano-paired-recorder · bench_instrumentation_and_independent_usb · 2026-10-01 21:38 PDT · pass_scoped:** Reusable owner recorder starts unchanged Collector.2 before device open and observes 25 SDK export boundaries afterward. Fresh bench channel-only run: 110 USB records, 27 bulk payload records, zero truncation/frame/USB bulk errors, 13 matched headers. Ten SDK calls returned zero, all 20 entry/exit events complete. Repeated ordinal 23 -> A0/84, ordinal 50 -> A0/A1, ordinal 51 -> A2; channel setup and cleanup also observed. Helper exit, released adapter lock and graceful Collector stop verified. Forty-eight owner tests pass for strict event privacy, gaps, ambiguity and preservation. No diagnostic transmit API, provider call or raw upload. Installed executable unchanged. Gap: Warm bench only; ten incoming pairing gaps and ten pending polling reads. Four control frames outside traced calls; two have multiple candidate millisecond boundaries. SDK send/receive exports were not observed inside validity calls; internal transport and payload/reply semantics unresolved. SDK opening-device entry/exit untraced, though its USB traffic is recorded. Instrumentation may affect timing. This is owner tooling, not a shipped public GUI feature or all-network CAN recording.
 
 ## Limits
 
