@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 PDT (off-site software follow-up). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-01 20:23 PDT (warm Windows firmware handoff). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -28,9 +28,9 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 VXDIAG driver 0.4.0.4; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`.
 
-Next test: Document complete adapter power removal; capture before Manager, followed by a separately bounded original-firmware handoff. Record exact adapter variant and firmware.
+Next test: Review NAO 9.250 diagnostic data-definition semantics before narrowly extending the read-only policy; separately qualify engine information and DTC reading. Full adapter power removal remains pending.
 
 Complete when: GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests.
 
@@ -61,6 +61,7 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 ## Next actions
 
 - **P1 · done · owner-gui:** Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command.
+- **P1 · pending · nano-firmware-policy:** Warm firmware startup and positive ECM VIN verified; engine entry blocked by local read-only command policy. Review data-definition semantics before any policy extension and separately test ECM information/DTC.
 - **P1 · pending · nano-cold:** Pending owner return: confirm complete Nano USB/bench power removal, then capture before Manager and perform a separately bounded firmware-handoff test. Adapter left untouched while owner is off-site.
 - **P1 · pending · public-roundtrip:** Qualify the public 0.5.3 live Chipsoft capture/review/sanitized-upload/read-back path.
 - **P2 · pending · adapter-onboarding:** Collect exact-model Windows/driver/firmware profiles for Mongoose, MDI and other adapters; keep statuses untested until evidence exists.
@@ -122,6 +123,7 @@ Evidence reference: owner-local: WINDOWS_OWNER_CATEGORY_RECEIPT_2026-10-01.json.
 - **nano-owner-gui-preflight · installed_cli_preflight · 2026-10-01 19:16 PDT · pass_scoped:** Mini UI unlocked and SSH reachable. Installed owner.2 digest verified; actual analyzer reproduced saved capture summary and rejected a recording-state fixture. Exact summary has a complete cached rejected JEV result, so a later GUI check can avoid a new model call. Installed x86 VXDIAG / ALLScanner VCXPT32.dll file version 0.4.0.4 recorded. No new model request, vehicle command or raw upload. Gap: EliteBook remains at Windows password screen. Folder selection, visible summary, cancellation and cached-result GUI checks remain untested. Adapter firmware and exact Nano variant remain unknown.
 - **nano-owner-gui · installed_gui_saved_capture · 2026-10-01 19:54 PDT · pass_scoped:** Actual installed owner.2 picker cancellation, displayed local summary, explicit consent cancellation, cached rejected-result display and unfinished-capture rejection passed. Disabled request button remained inert. Original capture and executable hashes, provider budget and request inventory unchanged; zero new provider calls, raw uploads or vehicle commands. Gap: Saved-capture GUI verification only. Cached rejection is not model accuracy. Category mappings provisional; return-status and ECU outcome decoding absent. Full adapter power removal and original-firmware handoff remain unqualified.
 - **nano-acceptance-blindspot · source_review_and_synthetic · 2026-10-01 PDT · pass_scoped:** New regression proves different hypothetical command reply status bytes produce identical schema-2 category summaries; acceptance and ECU outcome remain unassessed. All 28 owner Python checks pass. Retained source review identifies separate vendor SDK return checks, without establishing wire status semantics. Test/plan commit 8d68a72; installed executable unchanged. Gap: This verifies the current summary limitation, not a reply-status decoder or model accuracy. Owner is off-site; adapter power state unchanged. Physical cold-start and firmware handoff remain pending.
+- **nano-warm-firmware-handoff · bench_gui_and_independent_wire · 2026-10-01 20:19–20:23 PDT · pass_scoped:** Exact private Windows 0.2.16 candidate reached original SAAB NAO 9.250 Welcome/Main Menu, accepted arrow/Enter navigation and selected the 2004 NG 9-3 profile. Fresh launcher VIN and a separate positive ECM VIN exchange inside firmware independently matched the saved observation. Firmware showed key-position OK, then its data-definition command was stopped by the local read-only policy before transmission. Owner.2 capture: 6,628 packets, zero truncation/frame errors/USB bulk errors. Driver cleanup, released exclusive lock, cleared display and graceful capture stop verified; no forced termination, provider call or upload. Adapter-reported firmware 1.9.4.2; x86 driver 0.4.0.4. Gap: Engine entry did not complete; ECM information and DTC reading unqualified. Ten incoming completions lack matching submissions and ten reads remain pending at stop. Warm bench only; owner-reported ECM identity, exact adapter variant and full power removal unverified. No public Nano support or model accuracy qualification.
 
 ## Limits
 

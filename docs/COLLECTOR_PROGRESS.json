@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 PDT (off-site software follow-up)",
+  "updated_pacific": "2026-10-01 20:23 PDT (warm Windows firmware handoff)",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -184,6 +184,16 @@
       "result": "pass_scoped",
       "observation": "New regression proves different hypothetical command reply status bytes produce identical schema-2 category summaries; acceptance and ECU outcome remain unassessed. All 28 owner Python checks pass. Retained source review identifies separate vendor SDK return checks, without establishing wire status semantics. Test/plan commit 8d68a72; installed executable unchanged.",
       "gaps": "This verifies the current summary limitation, not a reply-status decoder or model accuracy. Owner is off-site; adapter power state unchanged. Physical cold-start and firmware handoff remain pending."
+    },
+    {
+      "id": "nano-warm-firmware-handoff",
+      "artifact": "owner-002",
+      "adapter": "vcx-nano",
+      "kind": "bench_gui_and_independent_wire",
+      "date_pacific": "2026-10-01 20:19\u201320:23 PDT",
+      "result": "pass_scoped",
+      "observation": "Exact private Windows 0.2.16 candidate reached original SAAB NAO 9.250 Welcome/Main Menu, accepted arrow/Enter navigation and selected the 2004 NG 9-3 profile. Fresh launcher VIN and a separate positive ECM VIN exchange inside firmware independently matched the saved observation. Firmware showed key-position OK, then its data-definition command was stopped by the local read-only policy before transmission. Owner.2 capture: 6,628 packets, zero truncation/frame errors/USB bulk errors. Driver cleanup, released exclusive lock, cleared display and graceful capture stop verified; no forced termination, provider call or upload. Adapter-reported firmware 1.9.4.2; x86 driver 0.4.0.4.",
+      "gaps": "Engine entry did not complete; ECM information and DTC reading unqualified. Ten incoming completions lack matching submissions and ten reads remain pending at stop. Warm bench only; owner-reported ECM identity, exact adapter variant and full power removal unverified. No public Nano support or model accuracy qualification."
     }
   ],
   "adapters": [
@@ -210,7 +220,7 @@
     {
       "id": "vcx-nano",
       "name": "VCX Nano (exact variant pending)",
-      "platform": "Windows 10 x64 / EliteBook; x86 VXDIAG driver 0.4.0.4; owner bench",
+      "platform": "Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench",
       "public_stages": {
         "capture": "not_tested",
         "stop": "not_tested",
@@ -230,9 +240,10 @@
         "nano-owner-native",
         "nano-owner-gui-preflight",
         "nano-owner-gui",
-        "nano-acceptance-blindspot"
+        "nano-acceptance-blindspot",
+        "nano-warm-firmware-handoff"
       ],
-      "next_test": "Document complete adapter power removal; capture before Manager, followed by a separately bounded original-firmware handoff. Record exact adapter variant and firmware.",
+      "next_test": "Review NAO 9.250 diagnostic data-definition semantics before narrowly extending the read-only policy; separately qualify engine information and DTC reading. Full adapter power removal remains pending.",
       "completion": "GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests."
     },
     {
@@ -296,6 +307,12 @@
       "priority": "P1",
       "state": "done",
       "action": "Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command."
+    },
+    {
+      "id": "nano-firmware-policy",
+      "priority": "P1",
+      "state": "pending",
+      "action": "Warm firmware startup and positive ECM VIN verified; engine entry blocked by local read-only command policy. Review data-definition semantics before any policy extension and separately test ECM information/DTC."
     },
     {
       "id": "nano-cold",
