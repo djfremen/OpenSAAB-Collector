@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-01 19:16 PDT",
+  "updated_pacific": "2026-10-01 19:54 PDT",
   "scope": "Collector capture tooling; diagnostic transports and model advice require separate qualification.",
   "public_version": "0.5.3-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -164,6 +164,16 @@
       "result": "pass_scoped",
       "observation": "Mini UI unlocked and SSH reachable. Installed owner.2 digest verified; actual analyzer reproduced saved capture summary and rejected a recording-state fixture. Exact summary has a complete cached rejected JEV result, so a later GUI check can avoid a new model call. Installed x86 VXDIAG / ALLScanner VCXPT32.dll file version 0.4.0.4 recorded. No new model request, vehicle command or raw upload.",
       "gaps": "EliteBook remains at Windows password screen. Folder selection, visible summary, cancellation and cached-result GUI checks remain untested. Adapter firmware and exact Nano variant remain unknown."
+    },
+    {
+      "id": "nano-owner-gui",
+      "artifact": "owner-002",
+      "adapter": "vcx-nano",
+      "kind": "installed_gui_saved_capture",
+      "date_pacific": "2026-10-01 19:54 PDT",
+      "result": "pass_scoped",
+      "observation": "Actual installed owner.2 picker cancellation, displayed local summary, explicit consent cancellation, cached rejected-result display and unfinished-capture rejection passed. Disabled request button remained inert. Original capture and executable hashes, provider budget and request inventory unchanged; zero new provider calls, raw uploads or vehicle commands.",
+      "gaps": "Saved-capture GUI verification only. Cached rejection is not model accuracy. Category mappings provisional; return-status and ECU outcome decoding absent. Full adapter power removal and original-firmware handoff remain unqualified."
     }
   ],
   "adapters": [
@@ -208,9 +218,10 @@
         "nano-owner-reboot",
         "nano-model-rejection",
         "nano-owner-native",
-        "nano-owner-gui-preflight"
+        "nano-owner-gui-preflight",
+        "nano-owner-gui"
       ],
-      "next_test": "Sign in to Windows and verify owner.2 analysis screens with the existing cached rejected result; then document full adapter power removal and capture before Manager, followed by a separately bounded firmware handoff. Record exact adapter variant and firmware.",
+      "next_test": "Document complete adapter power removal; capture before Manager, followed by a separately bounded original-firmware handoff. Record exact adapter variant and firmware.",
       "completion": "GUI consent/local summary verified; repeatable cold-start evidence and separately qualified handoff. Public capture/upload and reliable model advice need their own tests."
     },
     {
@@ -272,8 +283,8 @@
     {
       "id": "owner-gui",
       "priority": "P1",
-      "state": "pending",
-      "action": "Windows sign-in is required; then verify owner.2 picker, local summary, consent cancellation, cached rejected result and incomplete-capture handling. Mini is now unlocked."
+      "state": "done",
+      "action": "Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command."
     },
     {
       "id": "nano-cold",
