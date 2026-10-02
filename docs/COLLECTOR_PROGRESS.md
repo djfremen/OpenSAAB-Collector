@@ -2,7 +2,7 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-01 21:42 PDT (paired USB / SDK recorder tested). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-01 22:34 PDT (JEV coverage routing and read-pool comparison). Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
 Collector capture tooling; diagnostic transports and model advice require separate qualification.
 
@@ -28,9 +28,9 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`.
 
-Next test: Use paired Collector USB and SDK recording to trace a reviewed lower transport boundary inside the mapped validity calls; exported send/receive functions were not observed there. Separately review the firmware data-definition guard and test physical cold start when the owner returns.
+Next test: Inspect creation/completion/shutdown of the vendor receive queue locally, comparing first USB submission boundaries. Prepare capture before adapter enumeration and a separate synchronized whole-vehicle reference when hardware setup is confirmed; payload semantics and the firmware command guard remain separate pending work.
 
 Complete when: Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.
 
@@ -60,13 +60,14 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 
 ## Next actions
 
+- **P1 · pending · nano-read-pool-coverage:** Seven-recording comparison and JEV routing favor receive-pool lifecycle inspection. Ten pending IN reads occur even with fully paired completions; do not treat them as proof of loss/crash. Whole-vehicle reference and loss counters still required for bounded CAN coverage.
 - **P1 · pending · nano-validity-semantics:** Reusable paired USB/SDK recorder repeats all five startup exchanges inside three successful validity calls. Twenty-five export hooks reveal no send/receive-export event inside them; next locate a reviewed lower transport boundary and determine input/reply handling without changing vendor checks.
 - **P1 · done · owner-gui:** Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command.
 - **P1 · pending · nano-firmware-policy:** Warm firmware startup and positive ECM VIN verified; engine entry blocked by local read-only command policy. Review data-definition semantics before any policy extension and separately test ECM information/DTC.
 - **P1 · pending · nano-cold:** Pending owner return: confirm complete Nano USB/bench power removal, then capture before Manager and perform a separately bounded firmware-handoff test. Adapter left untouched while owner is off-site.
 - **P1 · pending · public-roundtrip:** Qualify the public 0.5.3 live Chipsoft capture/review/sanitized-upload/read-back path.
 - **P2 · pending · adapter-onboarding:** Collect exact-model Windows/driver/firmware profiles for Mongoose, MDI and other adapters; keep statuses untested until evidence exists.
-- **P2 · pending · model-corpus:** Structured JEV fact assessment remains rejected; bounded off-site experiment routing succeeded once. Build labelled failure/missing-evidence corpus before claiming accuracy or exposing public advice.
+- **P2 · pending · model-corpus:** Model fact assessments remain rejected, including unsupported dropped-CAN inference. Typed experiment routing succeeds narrowly. Preserve these failures and build labelled missing-evidence/error cases before public advice or accuracy claims.
 
 ## Evidence by exact artifact
 
@@ -143,6 +144,16 @@ Source: `6e04d35`. Executable SHA-256: `not recorded`.
 Evidence reference: owner-local: PAIRED_USB_SDK_FINDINGS_2026-10-01.md.
 
 - **nano-paired-recorder · bench_instrumentation_and_independent_usb · 2026-10-01 21:38 PDT · pass_scoped:** Reusable owner recorder starts unchanged Collector.2 before device open and observes 25 SDK export boundaries afterward. Fresh bench channel-only run: 110 USB records, 27 bulk payload records, zero truncation/frame/USB bulk errors, 13 matched headers. Ten SDK calls returned zero, all 20 entry/exit events complete. Repeated ordinal 23 -> A0/84, ordinal 50 -> A0/A1, ordinal 51 -> A2; channel setup and cleanup also observed. Helper exit, released adapter lock and graceful Collector stop verified. Forty-eight owner tests pass for strict event privacy, gaps, ambiguity and preservation. No diagnostic transmit API, provider call or raw upload. Installed executable unchanged. Gap: Warm bench only; ten incoming pairing gaps and ten pending polling reads. Four control frames outside traced calls; two have multiple candidate millisecond boundaries. SDK send/receive exports were not observed inside validity calls; internal transport and payload/reply semantics unresolved. SDK opening-device entry/exit untraced, though its USB traffic is recorded. Instrumentation may affect timing. This is owner tooling, not a shipped public GUI feature or all-network CAN recording.
+
+### coverage-research-2026-10-01 · owner_only
+
+Source: `80286c1`. Executable SHA-256: `not recorded`.
+
+Evidence reference: owner-local: CAN_COVERAGE_JEV_2026-10-01.md.
+
+- **nano-coverage-tooling · saved_capture_and_synthetic · 2026-10-01 22:30 PDT · pass_scoped:** New private CLI compares seven distinct stopped Collector recordings and optional SDK evidence. All seven end with ten pending IN reads; three have zero orphan input completions, four have ten. In the paired trace, six orphan read keys reappear in later submissions and five remain pending, consistent with a read-pool boundary explanation without proving it. Zero frame/USB bulk errors in these recordings. Sixty-three tests pass for privacy, missing SDK evidence, truncated input, duplicate recording weighting, pointer reuse, immutable tool facts, model guards and cache/uncertainty. Originals preserved. Gap: Request IDs are reused pointers; no durable identity or missing history is established. No capture-drop counter, independent bus reference, qualified CAN decoder or whole-vehicle coverage. This is private Mini analysis of saved Collector files; installed Windows button is unchanged. Other adapters remain untested.
+- **nano-coverage-model-review · model_evaluation_saved_capture · 2026-10-01 22:24 PDT · rejected:** One actual JEV fact review selected read-pool investigation, but assigned 0.60 to dropped CAN being proven despite missing reference/drop evidence; deterministic guard rejected the full assessment. 2,344 input / 148 output tokens; reported cost $0.000098448. No raw bytes, IDs, paths, code or credentials in model state. Gap: Model fact-classification reliability remains unqualified. Rejected result is preserved; a sensible experiment choice does not validate its causal claims.
+- **nano-coverage-model-routing · model_routing_saved_capture · 2026-10-01 22:26 PDT · pass_scoped:** Default workflow now fixes evidence facts in local tooling and asks JEV only to rank authored experiments. Actual typed-choice call selected read-pool inspection (0.79), followed by receive/filter audit (0.18); prohibited claims scored zero. 2,293 input / 89 output tokens; reported cost $0.000096306. Both coverage calls combined $0.000194754. Existing key cap/expiry, daily request bound, cache and uncertain-send policy retained; no automatic test execution or live CAN control. Gap: Scores are uncalibrated. Useful routing is not accuracy, a proven read-pool cause, recovered traffic, public support or completed vehicle CAN coverage. The prior fact assessment remains rejected.
 
 ## Limits
 
