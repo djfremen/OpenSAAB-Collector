@@ -2,9 +2,9 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-02 01:00 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-02 18:15 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
 
-Collector capture tooling; diagnostic transports and model advice require separate qualification.
+Collector capture tooling and private Nano research. October 2: direct Windows warm VIN and adapter reboot verified; independent cold initialization remains unresolved. Diagnostic transports and model advice require separate qualification.
 
 ## Adapter matrix
 
@@ -28,11 +28,11 @@ Complete when: Exact 0.5.3 digest, selected-device traffic, graceful cleanup, or
 
 ### VCX Nano (exact variant pending)
 
-Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`, `nano-beep-reference`, `nano-direct-beep`, `nano-pixel-vin-channel-rejected`, `nano-init-comparison`.
+Environment: Windows 10 x64 / EliteBook; x86 driver 0.4.0.4, adapter-reported firmware 1.9.4.2; owner bench. Evidence: `nano-channel-only`, `nano-manager-startup`, `nano-warm-vin`, `nano-owner-reboot`, `nano-model-rejection`, `nano-owner-native`, `nano-owner-gui-preflight`, `nano-owner-gui`, `nano-acceptance-blindspot`, `nano-warm-firmware-handoff`, `nano-jev-structure`, `nano-jev-priority`, `nano-validity-live-trace`, `nano-paired-recorder`, `nano-coverage-tooling`, `nano-coverage-model-review`, `nano-coverage-model-routing`, `nano-beep-reference`, `nano-direct-beep`, `nano-pixel-vin-channel-rejected`, `nano-init-comparison`, `nano-windows-direct-warm-r4`, `nano-direct-adapter-reboot-r4`, `nano-direct-post-reboot-rejection-r4`, `nano-direct-physical-cold-rejection-r4`, `nano-original-startup-restores-direct-r4`, `nano-startup-observer-and-ui-failures`, `nano-manager-and-load-dll-negative`, `nano-observed-original-warm-recovery`, `nano-independent-readiness-boundary-analysis`.
 
-Next test: Prepare direct-before-vendor / vendor / direct-after-vendor channel-only controls on the same host with Collector recording before open, exact open parameters and documented power state. Hardware relocation is not confirmed. Inspect vendor FE/96 handling and prelude generation locally; no opaque replay. A later direct VIN pass requires a fresh positive ECU reply and verified cleanup.
+Next test: Recover ordinary fresh startup request generation and reply validation, then implement them independently in shared Nano code without Tech2Win, Manager or vendor DLLs. A complete-car ignition-on comparison is proposed, not performed; confirm placement and keep it separate from bench evidence.
 
-Complete when: Repeatable call-boundary mapping is recorded; payload/status interpretation still needs independent labels and controls. Cold-start, full firmware handoff, public capture/upload and model accuracy require separate evidence.
+Complete when: Same exact native artifact starts before vendor software after independently documented loss of both USB and OBD power, reads a wire-verified VIN, cleans up, reopens under the powered state, and repeats from another cold start. Full firmware/info/DTC and public capture/upload retain separate gates.
 
 ### Mongoose (exact model pending)
 
@@ -60,12 +60,13 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 
 ## Next actions
 
+- **P1 · done · nano-windows-warm-vin-and-reboot:** Exact private Windows native probe passed warm read-only VIN with independent wire/cleanup evidence and an adapter-reboot acknowledgement. Warm readiness still requires vendor startup; public Nano support remains unqualified.
 - **P1 · done · nano-direct-beep:** Own sender verified Nano identity and two beep success replies with no VCX library loaded; original Collector captures independently validate exchange. Audibility and cold start are still unverified.
 - **P1 · pending · nano-read-pool-coverage:** Seven-recording comparison and JEV routing favor receive-pool lifecycle inspection. Ten pending IN reads occur even with fully paired completions; do not treat them as proof of loss/crash. Whole-vehicle reference and loss counters still required for bounded CAN coverage.
-- **P1 · pending · nano-validity-semantics:** Reusable paired USB/SDK recorder repeats all five startup exchanges inside three successful validity calls. Twenty-five export hooks reveal no send/receive-export event inside them; next locate a reviewed lower transport boundary and determine input/reply handling without changing vendor checks.
+- **P1 · pending · nano-validity-semantics:** Original startup controls narrow the readiness target to a changing three-step request/reply path. Recover generation and validation below mapped boundaries; current code extraction omits implementation bodies. SDK-export hooks caused measured failures. No static captured-payload replay or vendor-check modification.
 - **P1 · done · owner-gui:** Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command.
-- **P1 · pending · nano-firmware-policy:** Warm firmware startup and positive ECM VIN verified; engine entry blocked by local read-only command policy. Review data-definition semantics before any policy extension and separately test ECM information/DTC.
-- **P1 · pending · nano-cold:** Confirm complete USB/bench power removal and capture before any vendor application. First repeat own-transport identity/beep, then separately qualify diagnostic initialization; warm direct beep does not settle cold-start dependency.
+- **P1 · pending · nano-firmware-policy:** Private Windows warm VIN is qualified from our native probe. Original-firmware Engine/info/DTC remain separately pending; bench missing-module and vehicle-selection limitations are retained. Review the existing narrow data-definition guard before changing policy.
+- **P1 · pending · nano-cold:** Controlled full USB/OBD power-loss test completed and direct channel opening failed before vehicle TX. Independent cold initialization is still unresolved. Implement our portable initializer and qualify two separate full-power-loss starts before any vendor program, followed by VIN and cleanup.
 - **P1 · pending · public-roundtrip:** Qualify the public 0.5.3 live Chipsoft capture/review/sanitized-upload/read-back path.
 - **P2 · pending · adapter-onboarding:** Collect exact-model Windows/driver/firmware profiles for Mongoose, MDI and other adapters; keep statuses untested until evidence exists.
 - **P2 · pending · model-corpus:** Model fact assessments remain rejected, including unsupported dropped-CAN inference. Typed experiment routing succeeds narrowly. Preserve these failures and build labelled missing-evidence/error cases before public advice or accuracy claims.
@@ -189,6 +190,36 @@ Evidence reference: owner-local: NANO_INIT_COMPARISON_2026-10-02.md.
 
 - **nano-init-comparison · saved_recordings_and_model_routing · 2026-10-02 00:54 PDT · pass_scoped:** Four unchanged stopped recordings indexed privately: Windows vendor channel-only, vendor VIN, direct beep and Pixel direct VIN attempt. Same open parameters succeed in vendor channel-only but return FE on Pixel; vendor VIN uses a different third byte. Both vendor paths have the five-step changing prelude, Pixel does not. Corrected JEV routing chooses a same-host control; 81 owner tests pass. Two calls reported $0.000251034 total. Gap: No new hardware capture or command. Pixel source is an application log, not USBPcap; whole-bus gap counter unavailable. Initial model input had an incorrect data-header counter and is preserved as superseded; corrected result is separate. Returned scores are uncalibrated advice. Preconditions/FE semantics/cold-start causality remain unresolved; no public Nano support or model accuracy claim.
 
+### nano-windows-direct-private-r4 · owner_only
+
+Source: `7c8968c43fbfeefdcc591e6c0024df31041d69c2`. Executable SHA-256: `d1bf33f6d9265b2fb0f336a76b57af6d3613632d4fa62b92d57ec44815aaa3a4`.
+
+Evidence reference: owner-local: VCX_NANO_WINDOWS_DIRECT_GATE_2026-10-02.md; per-run frozen binary/capture receipts.
+
+- **nano-windows-direct-warm-r4 · bench_direct_transport · 2026-10-02 PDT · pass_scoped:** Exact private Windows native probe uses our Nano framing/channel client over OS serial. After documented original Tech2Win conditioning, one read-only VIN request plus flow control produced three ordered positive ECU frames independently matching the probe result. Shutdown statuses passed, serial closed and ownership lock reacquired. Sender imports/module observations show no vendor SDK loading, with transient-observation limits recorded. Gap: Vendor-assisted warm startup remains required; installed OS serial driver remains. This standalone probe does not qualify original-firmware Engine/info/DTC, independent cold startup, other networks or public Nano support.
+- **nano-direct-adapter-reboot-r4 · bench_adapter_only · 2026-10-02 PDT · pass_scoped:** Own Windows probe verified identity, issued one measured empty adapter-reboot command and received its exact success reply. No CAN channel or vehicle traffic; serial closed and lock reacquired. Vendor Restart reference corroborates the command form. Gap: Acknowledged adapter reboot is not physical loss of both supplies or proof of persistent profile reset. Distinct reset/profile semantics remain unresolved; recovery is separately tested.
+- **nano-direct-post-reboot-rejection-r4 · bench_reboot_control · 2026-10-02 PDT · failed:** Warm direct VIN pass was followed by acknowledged adapter reboot. A direct attempt more than 45 seconds later verified identity but received FE at channel opening, before vehicle TX. Filter cleanup replied 96 while stop/close replied zero; serial closed and lock reacquired. Gap: Retain the negative result and rejected filter cleanup. FE/96 meanings remain unknown; an identity or reboot acknowledgement does not qualify diagnostic readiness.
+- **nano-direct-physical-cold-rejection-r4 · owner_confirmed_physical_cold_bench · 2026-10-02 PDT · failed:** Owner confirmed removal of USB and OBD/bench power. Four uninterrupted USB-absence samples spanned 10.348 seconds; fresh enumeration was recorded. Our direct client ran before vendor software and received FE on channel opening, with zero vehicle TX. Serial closed and lock reacquired. Gap: This is a qualified cold-state negative, not an independent-start pass. Power removal is owner-observed and USB absence is host-measured; complete vehicle/module coverage remains untested.
+- **nano-original-startup-restores-direct-r4 · bench_vendor_reference_and_direct_result · 2026-10-02 PDT · pass_scoped:** Retained same-host control establishes direct FE, followed by normal original Tech2Win Main Menu/close, then independently wire-qualified direct VIN and cleanup from the unchanged native probe. Original startup contained no observed CAN/data TX. USBPcap phases and separate sender outcomes retained. Gap: This establishes resident warm readiness after vendor conditioning, not a vendor-free initializer. Pairing boundary gaps remain recorded; no independent bus-loss counter or full CAN coverage claim.
+- **nano-manager-and-load-dll-negative · bench_two_vendor_comparison_controls · 2026-10-02 PDT · failed:** After measured adapter reboot and negative direct baselines, normal Manager launch/green license view did not restore direct readiness. A separate Manager plus installed PASSTHRU helper, VXDIAG interface selection and successful Load DLL also left direct opening at FE before vehicle TX. Both helpers closed normally; capture intervals and cleanup verified. Gap: The installed helper has no Tech2 interface entry, so this is explicitly a variation from the reviewed video workflow. Device Open/Connect were not tested. No explicit beep command was observed; autonomous sound is not excluded and audible confirmation remains separate.
+
+### nano-startup-controls-private-2026-10-02 · owner_only
+
+Source: `76f18c09d5ceafc4dc5beee355dd48b8a0d04283`. Executable SHA-256: `not recorded`.
+
+Evidence reference: owner-local: NANO_COLD_START_AUTOMATION_2026-10-02.md; individual run manifests preserve tested snapshots.
+
+- **nano-startup-observer-and-ui-failures · bench_failed_observation_controls · 2026-10-02 PDT · failed:** SDK-export interception produced startup failures; Windows events identify the instrumentation agent and exception. Untraced and attachment-only startup controls passed. A later manually operated startup missed its UI deadline and required termination; no follow-up VIN was run in that rejected case. Failed captures and receipts remain retained. Gap: Hooked and force-terminated runs cannot qualify normal startup. Interceptor fault semantics remain unresolved; the external UI wait was increased only for the later manual-control mode.
+- **nano-observed-original-warm-recovery · bench_observed_original_startup · 2026-10-02 PDT · pass_scoped:** Native remote-display control brought original Tech2Win to its exact Main Menu template; the process closed normally with exit zero and no force kill. A fresh direct VIN matched the captured response and passed cleanup. Capture stopped gracefully; test tasks/processes were removed. SDK injection/hooks were disabled. Thirty-two evidence/parser tests passed on Mini and Windows for the runner tooling. Gap: This repeat began already warm after the preceding incomplete startup attempt. It is not a fresh FE-to-pass or cold-init proof. Exact per-run tooling manifests and the rejected earlier case remain separately retained.
+
+### nano-readiness-analysis-private-2026-10-02 · owner_only
+
+Source: `92db6ba431c0f03527ac3dd9712bcb18fc2eeedf`. Executable SHA-256: `not recorded`.
+
+Evidence reference: owner-local: NANO_INDEPENDENT_READINESS_2026-10-02.md; offline input manifest and reviewed results.
+
+- **nano-independent-readiness-boundary-analysis · offline_stopped_capture_and_synthetic_checks · 2026-10-02 PDT · pass_scoped:** Five distinct retained phase recordings were compared without hardware or vendor launch. Three original-startup recordings contain 30 complete adjacent cycles of the narrower three-step startup path; two Manager comparisons contain none. Fresh request payloads vary, and exact equality relationships are preserved privately. Forty-three comparison/evidence tests pass, including synthetic USB decoding and damaged, duplicate, stale and reordered inputs. Existing code extraction lacks the mapped implementation bodies. Gap: Order, lengths, replies and variability do not recover request generation/validation or prove necessity/sufficiency. Native initializer remains unimplemented. Rejected UI-startup evidence stays rejected; warm baseline and ten unmatched USB completions/ten pending reads per phase remain explicit.
+
 ## Limits
 
 - Capture, diagnostic communication, sanitizer coverage, upload storage and model accuracy are separate qualifications.
@@ -197,6 +228,7 @@ Evidence reference: owner-local: NANO_INIT_COMPARISON_2026-10-02.md.
 - No raw captures, VINs, seeds, credentials, contact details, notes or device serials belong in this register or dashboard. Private receipts and payload evidence stay private.
 - No field-user success is claimed by these bench and synthetic tests. Capture totals are not people, unique cars or full diagnostic success.
 - Historical shim/native-log implementations remain archived and are not features of the current public USBPcap application.
+- October 2 independent Nano initialization is unresolved. Manager green licenses, beep acknowledgement, Load DLL, and successful vendor-conditioned VIN are not substitutes for a direct-first physical-cold pass. No complete-car relocation/test has been performed in these new cases.
 
 ## Maintaining the record
 
