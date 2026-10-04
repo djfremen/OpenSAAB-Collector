@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-04 01:03 PDT",
+  "updated_pacific": "2026-10-04 01:08 PDT",
   "scope": "Collector 0.5.6-preview.1 is published with required Chipsoft/MDI/Mongoose/Nano provenance, model-labelled UTC folders/ZIPs and metadata, compatible live private upload validation and tablet layout. Native Windows software checks and legacy/labelled synthetic server read-backs passed. Actual tablet touch, on-screen keyboard launching and current-build per-adapter hardware qualification remain separate pending tests. Nano owner research retains its existing evidence and gaps.",
   "public_version": "0.5.6-preview.1",
   "owner_version": "0.5.4-owner.2",
@@ -566,6 +566,16 @@
       "result": "pass_scoped",
       "observation": "All 35 server tests passed. Compatible API 0.5.6 became live through a two-file overlay preserving existing runtime configuration and website. Clearly marked legacy and Mongoose-labelled software fixtures uploaded successfully and were independently retrieved from private storage with byte-identical ZIPs, content-hash receipts and the exact declared filename metadata. Confirmed retry of the legacy fixture retained its object key.",
       "gaps": "These two retained fixtures contain no adapter/vehicle traffic and qualify no Mongoose hardware. An unsigned S3 request returned HTTP400 without object bytes; that request did not independently verify public bucket configuration. Private deployment/upload receipts stay outside this public register."
+    },
+    {
+      "id": "adapter-labels-056-download-page",
+      "artifact": "public-056-main",
+      "adapter": null,
+      "kind": "deployment_verification",
+      "date_pacific": "2026-10-04 PDT",
+      "result": "pass_scoped",
+      "observation": "The live Collector download section links to 0.5.6-preview.1 and explains declared adapter filenames, sanitizer preservation and larger/scrolling controls. Root independently verified exact deployed page bytes and API0.5.6 capabilities; service is Healthy1/1. Only the Collector section changed in a one-file overlay. Website source section was saved in local opensaab-site commit9619a34; all preexisting surrounding changes remained intact. The local dashboard Collector card is projected from this register.",
+      "gaps": "Deployment/software evidence only. Actual tablet touch/keyboard launching and new live Mongoose hardware capture remain pending; outside-page preservation does not qualify diagnostic coverage."
     }
   ],
   "adapters": [
@@ -700,7 +710,7 @@
       "id": "adapter-labels-056-rollout",
       "priority": "P1",
       "state": "done",
-      "action": "Collector 0.5.6-preview.1 published from passing native main CI. Compatible upload service is live; legacy and labelled synthetic packages were verified against private stored bytes and filename metadata. Public executable and documentation downloads matched all checksums. Website update uses only its Collector section."
+      "action": "Collector0.5.6-preview.1 is published from passing native main CI, compatible upload service and download page are live. Legacy/labelled synthetic stored bytes and filename metadata matched; all public assets matched checksums. Website deployment changed only its Collector section."
     },
     {
       "id": "mongoose-hub-picker",

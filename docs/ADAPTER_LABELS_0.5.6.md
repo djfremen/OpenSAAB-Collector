@@ -85,3 +85,13 @@ Native UI tests establish control size, clipping, keyboard focus and scroll
 reachability. Actual touchscreen input and launching Windows' on-screen keyboard
 on the contributor's Windows 8 x32 tablet remain pending. Prior hub-only capture
 evidence is preserved, and a fresh Mongoose diagnostic capture is still needed.
+
+The [live download page](https://www.opensaab.com/static/t2/download.html#collector)
+now links to this release. A separate one-file website overlay changed only the
+Collector section; the page outside that section and runtime configuration were
+preserved. Root independently checked the live page SHA-256
+`784da45b6bd93f393eec7ff4cdf43f9f377c932f86de343e8119eda2012c9d9f`
+and retained API0.5.6 capabilities. Koyeb reports Healthy,1/1 running. The safe
+deployment receipt is `collector-labels-20261004/site/deployment.json` under the
+private evidence directory. The dedicated local dashboard card also reflects
+the validated progress register.
