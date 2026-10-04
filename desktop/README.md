@@ -113,6 +113,19 @@ The application contains an HTTPS upload address, **no Cloudflare credentials**.
 - Windows 8.1 and Mongoose are **not yet hardware-validated**. A preview release
   must not be represented as universal adapter support.
 
+### USB hub device selection (0.5.5)
+
+Adapters connected through external USB hubs now appear in the picker. Select
+the adapter itself, for example **MongoosePro GM II**, rather than **Generic USB
+Hub**, the mouse or keyboard. Keep the hub and adapter connected while recording.
+The picker still excludes disabled display-only children of composite devices.
+
+Version 0.5.3 incorrectly hid physical devices beneath external hubs. An affected
+Windows 8 Pro x32 upload contained only hub control records; it did not record
+Mongoose diagnostics. The 0.5.5 parser regression covers physical devices behind
+one or two hubs, direct devices and composite display children. Windows 8 Pro x32
+with Mongoose still needs a new hardware capture after this fix.
+
 ## Build
 
 On Windows, run `desktop\build.ps1` in Windows PowerShell. It uses the installed

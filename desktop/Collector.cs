@@ -1,6 +1,6 @@
 using System;using System.IO;using System.Net;using System.Net.Http;using System.Diagnostics;using System.Drawing;using System.Windows.Forms;using System.Threading.Tasks;using System.Text;using System.Text.RegularExpressions;using System.Collections.Generic;using System.Web.Script.Serialization;using System.Security.Cryptography;using System.IO.Compression;
-[assembly:System.Reflection.AssemblyVersion("0.5.3.0")]
-[assembly:System.Reflection.AssemblyFileVersion("0.5.3.0")]
+[assembly:System.Reflection.AssemblyVersion("0.5.5.0")]
+[assembly:System.Reflection.AssemblyFileVersion("0.5.5.0")]
 [assembly:System.Reflection.AssemblyProduct("OpenSAAB Collector")]
 [assembly:System.Reflection.AssemblyDescription("Private USB adapter capture and upload")]
 namespace OpenSaab.Collector {
@@ -10,12 +10,8 @@ namespace OpenSaab.Collector {
    Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new CollectorForm());return 0;
   }
  }
- public class UsbDevice {
-  public string Hub;public int Address;public string Label;
-  public override string ToString(){return Hub.Replace(@"\\.\","")+" — "+Label;}
- }
  public static class Bundle {
-  public const string Version="0.5.3";
+  public const string Version="0.5.5";
   public const string Consent="collector-capture-v1";
   public const string Endpoint="https://www.opensaab.com/api/collector/captures";
   public static string Hash(string path){using(var f=File.OpenRead(path))using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(f)).Replace("-","").ToLowerInvariant();}
@@ -100,9 +96,9 @@ namespace OpenSaab.Collector {
     var list=new List<UsbDevice>();string hubs=CaptureEngine.Query(usb,"--extcap-interfaces");
     foreach(Match h in Regex.Matches(hubs,@"(?m)^interface \{value=(\\\\\.\\USBPcap[0-9]+)\}")){
      string hub=h.Groups[1].Value;string data=CaptureEngine.Query(usb,"--extcap-interface "+CaptureEngine.Quote(hub)+" --extcap-config");
-     foreach(string line in data.Split('\n')){var d=Regex.Match(line,@"^value \{arg=\d+\}\{value=(\d+)\}\{display=([^}]+)\}");if(d.Success && !line.Contains("{parent="))list.Add(new UsbDevice{Hub=hub,Address=int.Parse(d.Groups[1].Value),Label=d.Groups[2].Value});}
+     list.AddRange(UsbDevice.ParseConfig(hub,data));
     }return list;
-   });foreach(var d in found)devices.Items.Add(d);status.Text=found.Count>0?"Select the adapter (not a keyboard, camera or other peripheral). Keep it connected during capture.":"No capture devices found. Restart Windows if USBPcap was just installed.";
+   });foreach(var d in found)devices.Items.Add(d);status.Text=found.Count>0?"Select the adapter itself, including when connected through a USB hub. Do not select the hub, mouse or keyboard.":"No capture devices found. Restart Windows if USBPcap was just installed.";
   }catch(Exception e){Error(e);}finally{SetBusy(false);}}
   async Task Install(){SetBusy(true);try{
    status.Text="Downloading the official USBPcap installer…";ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
@@ -119,7 +115,7 @@ namespace OpenSaab.Collector {
     if(Process.GetProcessesByName("USBPcapCMD").Length>0)throw new Exception("Another USBPcap process is running. Stop it first.");
     if(Process.GetProcessesByName("Tech2Win").Length>0 || Process.GetProcessesByName("emulator").Length>0)throw new Exception("Close Tech2Win before capture so initialization is included.");
     string fresh=await Task.Run(()=>CaptureEngine.Query(usb,"--extcap-interface "+CaptureEngine.Quote(device.Hub)+" --extcap-config"));
-    if(!fresh.Contains("{value="+device.Address+"}{display="+device.Label+"}"))throw new Exception("Device list changed. Refresh and select the adapter again.");
+    if(!UsbDevice.ParseConfig(device.Hub,fresh).Exists(d=>d.Address==device.Address && d.Label==device.Label))throw new Exception("Device list changed. Refresh and select the adapter again.");
     captureStarted=DateTime.UtcNow;session=Path.Combine(BaseDir(),captureStarted.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,8));Directory.CreateDirectory(session);notes=0;
     manifest=new Dictionary<string,object>{{"format",1},{"collector_version",Bundle.Version},{"adapter",adapter.Text},{"device_label",device.Label},{"usb_interface",device.Hub},{"usb_address",device.Address},{"started_utc",captureStarted.ToString("o")},{"stopped_utc",""},{"os",Environment.OSVersion.VersionString},{"capture_state","starting"},{"stop_reason",""},{"consent",Bundle.Consent},{"diagnostic_success","not inferred"},{"capture_sha256",""}};
     CaptureEngine.Save(Path.Combine(session,"session.json"),manifest);File.WriteAllText(Path.Combine(session,"actions.jsonl"),"",new UTF8Encoding(false));
