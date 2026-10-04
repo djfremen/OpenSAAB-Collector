@@ -1,6 +1,6 @@
 # OpenSAAB Collector
 
-A simple Windows tool: **set up USBPcap → capture your adapter → stop → review → upload
+A simple Windows tool: **set up USBPcap → choose adapter model and USB device → capture → stop → review → upload
 privately to OpenSAAB when you choose.** No shims, driver DLL changes or background service.
 Wireshark is not required.
 
@@ -24,12 +24,14 @@ other encodings and security exchanges may remain. See the
 No Cloudflare passwords or storage keys are in the app.
 
 **Validation:** Windows 10 / Chipsoft Pro capture and private R2 round-trip were
-tested on 0.5.0. Public 0.5.5 fixes adapter selection behind external USB hubs.
-A reported Windows 8 Pro x32 / MongoosePro GM II upload exposed the bug: it
-contained hub records rather than adapter traffic. Automated regression checks
-cover the corrected picker; a fresh Windows 8/Mongoose hardware capture remains
-pending. See the [hub-fix release notes](docs/HUB_DEVICE_SELECTION_0.5.5.md) and
-[0.5.0 checkpoint](docs/AUTOMATED_COLLECTOR_2026-09-23.md) for their separate scopes.
+qualified on 0.5.0. Public 0.5.5 fixes physical-adapter selection behind external
+USB hubs, with passing Windows CI and verified public download hashes. The
+Windows 8 Pro x32 / MongoosePro GM II contributor upload exposed the bug but
+contains only hub controls; a corrected hardware capture remains pending. See the
+[hub-fix release notes](docs/HUB_DEVICE_SELECTION_0.5.5.md) and maintained
+[Collector progress matrix](docs/COLLECTOR_PROGRESS.md) for exact-build evidence,
+prior failures and remaining hardware qualification. Owner-only Nano research
+is recorded separately from public features.
 
 - [Contributor instructions](desktop/README.md)
 - [Capture privacy notice](docs/CAPTURE_PRIVACY.md)
@@ -52,3 +54,15 @@ its console stop problem is superseded by the new desktop capture engine.
 License: [Apache 2.0](LICENSE). USBPcap and OEM drivers are separate projects
 with their own licenses. Collector downloads USBPcap from its official release;
 it does not bundle or modify the vendor driver.
+
+## Adapter labels and tablet controls (0.5.6)
+
+The new required model dropdown contains **Chipsoft, MDI, Mongoose and Nano**.
+It labels saved folders, upload ZIP filenames and capture metadata independently
+of the physical USB capture-device picker. Names include the UTC start time and
+a random suffix, e.g. `OpenSAAB_MDI_20261004_073025Z_abcd1234.zip`.
+Sanitized copies keep the label; legacy captures continue to work without being
+relabelled. Larger controls, scrolling and on-screen keyboard buttons improve
+tablet use. See [the implementation and validation record](docs/ADAPTER_LABELS_0.5.6.md).
+Model selection records what the contributor chose; it is not an adapter-support
+claim. Actual tablet touch and per-adapter diagnostics still need hardware tests.

@@ -26,6 +26,9 @@ jobs:
         shell: powershell
         run: ./desktop/test.ps1
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: OpenSAAB-Collector-Windows
-          path: desktop/bin/OpenSAAB-Collector.exe
+          path: |
+            desktop/bin/OpenSAAB-Collector.exe
+            desktop/bin/collector-layout*.png
