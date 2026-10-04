@@ -574,7 +574,7 @@
       "kind": "deployment_verification",
       "date_pacific": "2026-10-04 PDT",
       "result": "pass_scoped",
-      "observation": "The live Collector download section links to 0.5.6-preview.1 and explains declared adapter filenames, sanitizer preservation and larger/scrolling controls. Root independently verified exact deployed page bytes and API0.5.6 capabilities; service is Healthy1/1. Only the Collector section changed in a one-file overlay. Website source section was saved in local opensaab-site commit9619a34; all preexisting surrounding changes remained intact. The local dashboard Collector card is projected from this register.",
+      "observation": "The live Collector download section links to 0.5.6-preview.1 and explains declared adapter filenames, sanitizer preservation and larger/scrolling controls. Root independently verified exact deployed page bytes and API 0.5.6 capabilities; service is Healthy with 1/1 running. Only the Collector section changed in a one-file overlay. Website source section was saved in local opensaab-site commit 9619a34; all preexisting surrounding changes remained intact. The local dashboard Collector card is projected from this register.",
       "gaps": "Deployment/software evidence only. Actual tablet touch/keyboard launching and new live Mongoose hardware capture remain pending; outside-page preservation does not qualify diagnostic coverage."
     }
   ],
@@ -710,7 +710,7 @@
       "id": "adapter-labels-056-rollout",
       "priority": "P1",
       "state": "done",
-      "action": "Collector0.5.6-preview.1 is published from passing native main CI, compatible upload service and download page are live. Legacy/labelled synthetic stored bytes and filename metadata matched; all public assets matched checksums. Website deployment changed only its Collector section."
+      "action": "Collector 0.5.6-preview.1 is published from passing native main CI, compatible upload service and download page are live. Legacy/labelled synthetic stored bytes and filename metadata matched; all public assets matched checksums. Website deployment changed only its Collector section."
     },
     {
       "id": "mongoose-hub-picker",
