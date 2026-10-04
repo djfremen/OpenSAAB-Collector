@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using OpenSaab.Collector;
 
@@ -12,6 +13,7 @@ using OpenSaab.Collector;
 // Capture workers, installers, keyboard launchers and network are not invoked.
 public static class CollectorLayoutTest {
  sealed class TestCollectorForm:CollectorForm {protected override void OnShown(EventArgs e){}}
+ [DllImport("user32.dll")]static extern IntPtr SendMessage(IntPtr window,int message,IntPtr wParam,IntPtr lParam);
  static void Require(bool condition,string message){if(!condition)throw new Exception(message);}
  static Control Find(Control parent,string name){var found=parent.Controls.Find(name,true);Require(found.Length==1,"Expected one control: "+name);return found[0];}
  static IEnumerable<Control> Descendants(Control parent){foreach(Control child in parent.Controls){yield return child;foreach(var nested in Descendants(child))yield return nested;}}
@@ -35,11 +37,26 @@ public static class CollectorLayoutTest {
   }
  }
  static void Reach(Form form,Panel viewport,string name){
-  var button=Find(form,name);viewport.ScrollControlIntoView(button);Settle(form);
+  var button=Find(form,name);string priorFocus=form.ActiveControl==null?"none":form.ActiveControl.Name;
+  viewport.ScrollControlIntoView(button);
+  var immediate=viewport.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
+  // Match interacting with the target. Otherwise explicitly laying out every
+  // container may scroll back to the previously focused field instead.
+  if(button.Enabled)Require(button.Focus(),"Could not focus visible action: "+name);
+  Settle(form);
   var bounds=viewport.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
-  string geometry=Geometry(form,button)+" viewport="+viewport.ClientRectangle+" translated="+bounds+" scroll="+viewport.AutoScrollPosition+" extent="+viewport.AutoScrollMinSize+" display="+viewport.DisplayRectangle;
+  string geometry=Geometry(form,button)+" viewport="+viewport.ClientRectangle+" beforeSettle="+immediate+" translated="+bounds+" scroll="+viewport.AutoScrollPosition+" extent="+viewport.AutoScrollMinSize+" display="+viewport.DisplayRectangle+" previousFocus="+priorFocus+" currentFocus="+(form.ActiveControl==null?"none":form.ActiveControl.Name);
+  Require(immediate.Top>=0 && immediate.Bottom<=viewport.ClientSize.Height && immediate.Left>=0 && immediate.Right<=viewport.ClientSize.Width,"ScrollControlIntoView did not expose action: "+name+geometry);
   Require(bounds.Top>=0 && bounds.Bottom<=viewport.ClientSize.Height,"Scrolled action remains out of view: "+name+geometry);
   Require(bounds.Left>=0 && bounds.Right<=viewport.ClientSize.Width,"Scrolled action exceeds viewport: "+name+geometry);
+ }
+ static void ScrollbarBottom(Form form,Panel viewport){
+  Find(form,"adapterModels").Focus();Settle(form);
+  // The same WM_VSCROLL/SB_BOTTOM path as a native scrollbar command, with an
+  // earlier field still focused. Do not substitute ScrollControlIntoView.
+  SendMessage(viewport.Handle,0x0115,new IntPtr(7),IntPtr.Zero);Application.DoEvents();
+  var donate=Find(form,"donate");var bounds=viewport.RectangleToClient(donate.RectangleToScreen(donate.ClientRectangle));
+  Require(viewport.ClientRectangle.Contains(bounds),"Native scrollbar cannot reach donation action"+Geometry(form,donate)+" translated="+bounds+" scroll="+viewport.AutoScrollPosition+" extent="+viewport.AutoScrollMinSize+" display="+viewport.DisplayRectangle);
  }
  static void MainLayout(){
   using(var form=new TestCollectorForm()){
@@ -63,6 +80,7 @@ public static class CollectorLayoutTest {
      Resize(form,size);var viewport=(Panel)Find(form,"collectorViewport");viewport.AutoScrollPosition=Point.Empty;Settle(form);Snapshot(form,"collector-layout-"+size.Width+"x"+size.Height);ButtonsFit(form);
      Require(viewport.AutoScroll && !viewport.HorizontalScroll.Visible,"Main layout needs horizontal scrolling window="+form.ClientSize+" viewport="+viewport.ClientRectangle+" scroll="+viewport.AutoScrollPosition);
      Require(Find(form,"adapterDetails").Height>=44 && Find(form,"stepNote").Height>=44,"Text entry targets too short");
+     ScrollbarBottom(form,viewport);
      foreach(string name in new[]{"start","stop","sanitize","viewReport","upload","donate"})Reach(form,viewport,name);
      Snapshot(form,"collector-layout-actions-"+size.Width+"x"+size.Height);
      if(size.Width==360)Require(Find(form,"stop").Top>Find(form,"start").Top,"Narrow action row failed to wrap");
