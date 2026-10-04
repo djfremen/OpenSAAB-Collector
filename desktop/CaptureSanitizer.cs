@@ -84,7 +84,9 @@ namespace OpenSaab.Collector {
     foreach(string name in Files){long limit=name=="usb.pcap"?64L*1024*1024:name=="session.json"?16384:65536;if(new FileInfo(Path.Combine(source,name)).Length>limit)throw new Exception("Capture or metadata exceeds the supported size.");File.Copy(Path.Combine(source,name),Path.Combine(output,name));}
     var json=new JavaScriptSerializer();string meta=Path.Combine(output,"session.json"),pcap=Path.Combine(output,"usb.pcap"),notes=Path.Combine(output,"actions.jsonl");
     var data=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(meta));
-    if(data==null || data.Count!=Fields.Length)throw new Exception("Unrecognized capture metadata. Nothing was sanitized.");
+    if(data==null || (data.Count!=Fields.Length && data.Count!=Fields.Length+2))throw new Exception("Unrecognized capture metadata. Nothing was sanitized.");
+    CaptureIdentity.Filename(data);
+    foreach(string field in data.Keys)if(Array.IndexOf(Fields,field)<0 && field!="adapter_model" && field!="capture_id")throw new Exception("Unrecognized capture metadata. Nothing was sanitized.");
     foreach(string field in Fields)if(!data.ContainsKey(field))throw new Exception("Incomplete capture metadata.");
     if(Convert.ToInt32(data["format"])!=1 || (string)data["consent"]!=Bundle.Consent || (string)data["capture_state"]!="stopped_gracefully")throw new Exception("Choose a completed capture before sanitizing.");
     if(!Regex.IsMatch((string)data["usb_interface"],@"\A\\\\\.\\USBPcap[0-9]+\z"))throw new Exception("Invalid USB interface.");

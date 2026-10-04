@@ -9,7 +9,7 @@ changes, background service or diagnostic commands. Wireshark is not required.**
 2. Run it as administrator. If USBPcap is missing, choose **Set up USBPcap**.
    Collector downloads the official USBPcap 1.5.4.0 installer and verifies its
    pinned SHA-256 before launching it. Complete that installer and restart Windows.
-3. Reopen Collector. Select your USB adapter from the list. If you are unsure,
+3. Reopen Collector. Choose **Chipsoft**, **MDI**, **Mongoose** or **Nano** from the required adapter-model dropdown, then select its physical USB device from the separate list. If you are unsure,
    compare the list before and after plugging in the adapter, then refresh.
    Leave your existing Mongoose, Chipsoft or other manufacturer's driver installed.
 4. Acknowledge the capture privacy notice, then choose **Start capture** before opening
@@ -81,12 +81,12 @@ Only these three files from the folder you select are packaged:
   Removing exchanges can reduce the capture's usefulness for adapter development.
 - `session.json`: capture metadata. You can blank the `adapter` and `device_label`
   string values to remove entered descriptions or device serials. Retain the
-  JSON field names and capture-format fields. The capture checksum is recalculated
+  JSON field names and capture-format fields. Keep the new `adapter_model` and `capture_id` identity fields together and unchanged; sanitization preserves these non-personal labels. The capture checksum is recalculated
   automatically in the new upload bundle after changes to `usb.pcap`.
 - `actions.jsonl`: your notes. Remove individual complete lines, edit their text
   while preserving JSON, or leave the file empty to omit all notes.
 
-Edit these files, **not `capture.zip`**. Every upload builds a fresh ZIP; it never
+Edit these files, **not the generated ZIP** (`OpenSAAB_<model>_<UTC timestamp>_<id>.zip` for new captures; `capture.zip` for older captures). Every upload builds a fresh ZIP; it never
 reuses an old ZIP from a failed attempt. Other local files, including worker
 configuration and upload receipts, are not included. Save and close your edits
 before choosing Upload. You may copy a capture folder and upload the edited copy.
@@ -113,11 +113,53 @@ The application contains an HTTPS upload address, **no Cloudflare credentials**.
 - Windows 8.1 and Mongoose are **not yet hardware-validated**. A preview release
   must not be represented as universal adapter support.
 
+### Adapter labels and tablet layout (0.5.6)
+
+The required model selector offers Chipsoft, MDI, Mongoose and Nano. This is
+contributor-declared provenance, separate from the USB device/address used for
+recording. It does not detect the model, verify driver compatibility or qualify
+OpenSAAB diagnostic support. Put exact variants and driver versions in the
+optional details field.
+
+New sessions are named, for example,
+`OpenSAAB_Mongoose_20261004_073025Z_abcd1234`. The enclosing saved folder and
+upload ZIP contain the model and UTC start time; the random suffix separates
+same-second captures. `session.json` retains `adapter_model` and `capture_id`,
+including after sanitization removes personal descriptions. The three internal
+ZIP entries remain `usb.pcap`, `session.json`, `actions.jsonl` for compatibility.
+Changing the dropdown later never changes an older capture or retry. Old
+captures without these fields retain `capture.zip` and are not guessed/relabelled.
+
+Private storage continues to use a content-hash `OSCAP-…` receipt/key. Identified
+uploads also retain the friendly filename as private object metadata and a
+download filename, confirmed by the upload receipt. A hash key is not the
+contributor-facing filename. The compatible server validator must be active
+before distributing this client.
+
+Forms now scroll on short screens and wrap action buttons on narrow screens.
+Buttons and text-entry fields are larger; Keyboard buttons open the built-in
+Windows on-screen keyboard. This improves the interface for tablets, but does
+not establish whether the contributor's Windows 8 digitizer/driver works.
+A repeat test on that actual tablet is still needed.
+
+### USB hub device selection (0.5.5)
+
+Adapters connected through external USB hubs now appear in the picker. Select
+the adapter itself, for example **MongoosePro GM II**, rather than **Generic USB
+Hub**, the mouse or keyboard. Keep the hub and adapter connected while recording.
+The picker still excludes disabled display-only children of composite devices.
+
+Version 0.5.3 incorrectly hid physical devices beneath external hubs. An affected
+Windows 8 Pro x32 upload contained only hub control records; it did not record
+Mongoose diagnostics. The 0.5.5 parser regression covers physical devices behind
+one or two hubs, direct devices and composite display children. Windows 8 Pro x32
+with Mongoose still needs a new hardware capture after this fix.
+
 ## Build
 
 On Windows, run `desktop\build.ps1` in Windows PowerShell. It uses the installed
 .NET Framework C# compiler and creates `desktop\bin\OpenSAAB-Collector.exe`.
-`WorkerTest.cs`, `UploadTest.cs`, `BundleTest.cs` and `SanitizeTest.cs` are developer harnesses, excluded from the app.
+`WorkerTest.cs`, `UploadTest.cs`, `CaptureIdentityTest.cs`, `CollectorLayoutTest.cs`, `BundleTest.cs` and `SanitizeTest.cs` are developer harnesses, excluded from the app.
 Run `desktop\test.ps1` to check fresh packaging, edited captures and invalid-input rejection.
 The release executable is currently unsigned.
 

@@ -1,6 +1,6 @@
 using System;using System.IO;using System.Net;using System.Net.Http;using System.Diagnostics;using System.Drawing;using System.Windows.Forms;using System.Threading.Tasks;using System.Text;using System.Text.RegularExpressions;using System.Collections.Generic;using System.Web.Script.Serialization;using System.Security.Cryptography;using System.IO.Compression;
-[assembly:System.Reflection.AssemblyVersion("0.5.3.0")]
-[assembly:System.Reflection.AssemblyFileVersion("0.5.3.0")]
+[assembly:System.Reflection.AssemblyVersion("0.5.6.0")]
+[assembly:System.Reflection.AssemblyFileVersion("0.5.6.0")]
 [assembly:System.Reflection.AssemblyProduct("OpenSAAB Collector")]
 [assembly:System.Reflection.AssemblyDescription("Private USB adapter capture and upload")]
 namespace OpenSaab.Collector {
@@ -10,19 +10,15 @@ namespace OpenSaab.Collector {
    Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);Application.Run(new CollectorForm());return 0;
   }
  }
- public class UsbDevice {
-  public string Hub;public int Address;public string Label;
-  public override string ToString(){return Hub.Replace(@"\\.\","")+" — "+Label;}
- }
  public static class Bundle {
-  public const string Version="0.5.3";
+  public const string Version="0.5.6";
   public const string Consent="collector-capture-v1";
   public const string Endpoint="https://www.opensaab.com/api/collector/captures";
   public static string Hash(string path){using(var f=File.OpenRead(path))using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(f)).Replace("-","").ToLowerInvariant();}
   public static string Build(string dir){
    // Always package a fresh snapshot. A previously failed upload may contain
    // personal data that the contributor has since removed from the source files.
-   string zip=Path.Combine(dir,"capture.zip");
+   string zip;
    string snapshot=Path.Combine(dir,".upload-"+Guid.NewGuid().ToString("N")),temp=snapshot+".zip";
    Directory.CreateDirectory(snapshot);
    try{
@@ -31,6 +27,7 @@ namespace OpenSaab.Collector {
     CaptureSanitizer.VerifyReport(snapshot);
     string meta=Path.Combine(snapshot,"session.json"),capture=Path.Combine(snapshot,"usb.pcap");
     var data=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(meta));
+    zip=Path.Combine(dir,CaptureIdentity.Filename(data));
     if((string)data["consent"]!=Consent || (string)data["capture_state"]!="stopped_gracefully")throw new Exception("Select a completed capture. Interrupted recordings cannot be uploaded.");
     CaptureEngine.Validate(capture,Convert.ToInt32(data["usb_address"]));
     data["capture_sha256"]=Hash(capture);CaptureEngine.Save(meta,data);
@@ -42,46 +39,28 @@ namespace OpenSaab.Collector {
    }finally{if(File.Exists(temp))File.Delete(temp);Directory.Delete(snapshot,true);}
   }
   public static async Task<string> Upload(string dir){
-   string zip=Build(dir),digest=Hash(zip);
+   string zip=Build(dir),digest=Hash(zip),filename=Path.GetFileName(zip);
    ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
    using(var handler=new HttpClientHandler{AllowAutoRedirect=false})using(var client=new HttpClient(handler){Timeout=TimeSpan.FromMinutes(5)})using(var f=File.OpenRead(zip))using(var req=new HttpRequestMessage(HttpMethod.Post,Endpoint)){
-    long bytes=f.Length;req.Content=new StreamContent(f);req.Content.Headers.ContentType=new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");req.Content.Headers.ContentLength=bytes;
+    long bytes=f.Length;req.Content=new StreamContent(f);req.Content.Headers.ContentType=new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");req.Content.Headers.ContentLength=bytes;req.Content.Headers.ContentDisposition=new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment"){FileName=filename};
     req.Headers.Add("X-Content-SHA256",digest);req.Headers.Add("X-OpenSAAB-Consent",Consent);
     using(var response=await client.SendAsync(req)){
      if(!response.IsSuccessStatusCode)throw new Exception("Upload not confirmed (HTTP "+(int)response.StatusCode+"). Local files retained. Retry later.");
      string text=await response.Content.ReadAsStringAsync();var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(text);
      if(!value.ContainsKey("stored") || !(value["stored"] is bool) || !(bool)value["stored"] || !value.ContainsKey("sha256") || (string)value["sha256"]!=digest || !value.ContainsKey("receipt") || (string)value["receipt"]!="OSCAP-"+digest || Convert.ToInt64(value["bytes"])!=bytes)throw new Exception("Server receipt could not be verified. Local files retained.");
+     if(filename!="capture.zip"){
+      object summary;var fields=value.TryGetValue("summary",out summary)?summary as Dictionary<string,object>:null;
+      if(fields==null || !fields.ContainsKey("capture_filename") || (string)fields["capture_filename"]!=filename)throw new Exception("Upload receipt did not confirm the adapter-labelled filename. Local files retained.");
+     }
      File.WriteAllText(Path.Combine(dir,"upload-receipt.json"),text,new UTF8Encoding(false));return (string)value["receipt"];
     }
    }
   }
  }
- public class CollectorForm:Form {
-  ComboBox devices=new ComboBox();TextBox adapter=new TextBox(),note=new TextBox();CheckBox consent=new CheckBox();Button setup=new Button(),refresh=new Button(),start=new Button(),stop=new Button(),add=new Button(),retry=new Button(),folder=new Button(),sanitize=new Button(),reportButton=new Button();Label status=new Label();
+ public partial class CollectorForm:Form {
+  ComboBox devices=new ComboBox(),adapterModels=new ComboBox();TextBox adapter=new TextBox(),note=new TextBox();CheckBox consent=new CheckBox();Button setup=new Button(),refresh=new Button(),start=new Button(),stop=new Button(),add=new Button(),retry=new Button(),folder=new Button(),sanitize=new Button(),reportButton=new Button();Label status=new Label();
   string usb,session;Process worker;Dictionary<string,object> manifest;bool busy,finishing;int notes;DateTime captureStarted;Timer timer=new Timer();
-  public CollectorForm(){
-   Text="OpenSAAB Collector "+Bundle.Version;ClientSize=new Size(690,626);MinimumSize=new Size(706,665);Font=new Font("Segoe UI",10);BackColor=Color.FromArgb(246,248,251);
-   using(var stream=typeof(CollectorForm).Assembly.GetManifestResourceStream("OpenSAAB.logo.png"))using(var source=Image.FromStream(stream)){
-    var logo=new PictureBox{Image=new Bitmap(source),SizeMode=PictureBoxSizeMode.Zoom,AccessibleName="OpenSAAB logo"};logo.SetBounds(24,18,64,64);Controls.Add(logo);
-   }
-   using(var stream=typeof(CollectorForm).Assembly.GetManifestResourceStream("OpenSAAB.icon.ico")){Icon=new Icon(stream);}
-   AddLabel("OpenSAAB Collector",100,18,564,36,21,true);AddLabel("Record your adapter. Help bring more devices to OpenSAAB.",100,58,564,27,10,false);
-   var donate=new Button();Btn(donate,"Donate · Support OpenSAAB",24,574,640,40,delegate{ShowSupport();});donate.Anchor=AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom;
-   AddLabel("1   Choose your USB adapter",24,100,640,27,12,true);
-   devices.SetBounds(24,134,500,30);devices.DropDownStyle=ComboBoxStyle.DropDownList;Controls.Add(devices);Btn(refresh,"Refresh",536,132,128,32,async delegate{await RefreshDevices();});
-   adapter.SetBounds(24,177,640,27);adapter.MaxLength=240;Controls.Add(adapter);AddLabel("Adapter model / driver version / car model and year (optional)",24,208,640,24,9,false);
-   Btn(setup,"Set up USBPcap",24,243,170,34,async delegate{await Install();});AddLabel("Wireshark is not required. First driver install needs a restart.",207,248,454,30,9,false);
-   consent.SetBounds(24,290,640,52);consent.Text="I understand this recording may contain VINs, serials and security data.\nCaptures stay on this computer until I choose Upload and confirm.";Controls.Add(consent);
-   Btn(start,"Start capture",24,357,194,42,async delegate{await StartCapture();});Btn(stop,"Stop capture",234,357,194,42,async delegate{await Finish();});stop.Enabled=false;
-   Btn(folder,"Open saved files",445,357,219,42,delegate{Process.Start(session ?? BaseDir());});
-   note.SetBounds(24,418,500,28);note.MaxLength=400;Controls.Add(note);Btn(add,"Add step note",536,415,128,34,delegate{AddNote();});add.Enabled=false;
-   status.SetBounds(24,460,640,56);status.Text="Connect the adapter, then refresh.";Controls.Add(status);
-   Btn(sanitize,"Sanitize capture",24,522,205,34,async delegate{await SanitizeSaved();});
-   Btn(reportButton,"View report",242,522,205,34,delegate{ReviewSanitization();});
-   Btn(retry,"Upload",460,522,204,34,async delegate{await UploadSaved();});
-   timer.Interval=500;timer.Tick+=async delegate{if(worker!=null && !busy && !finishing){if(worker.HasExited)await Finish();else status.Text="Recording — launch Tech2Win, select your adapter, then read VIN / ECM information / DTCs.\nElapsed: "+(DateTime.UtcNow-captureStarted).ToString(@"mm\:ss")+" (15-minute / 60 MiB limit)";}};timer.Start();
-   Shown+=async delegate{await RefreshDevices();};FormClosing+=delegate(object sender,FormClosingEventArgs e){if(worker!=null || busy){e.Cancel=true;MessageBox.Show("Finish the capture or current upload before closing. Local files will be retained.",Text);}};
-  }
+  public CollectorForm(){BuildLayout();}
   void ShowSupport(){
    if(worker!=null || busy){MessageBox.Show("Finish the capture or upload before opening project support.","Support OpenSAAB");return;}
    if(MessageBox.Show("Support is voluntary and does not unlock features. Contributions help fund adapter testing and documentation.\n\nOpen the OpenSAAB Ko-fi page in your browser? No capture or vehicle data is added to the link.","Support OpenSAAB",MessageBoxButtons.OKCancel,MessageBoxIcon.Information)==DialogResult.OK){
@@ -89,9 +68,7 @@ namespace OpenSaab.Collector {
    }
   }
   string BaseDir(){string p=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"OpenSAAB-Captures");Directory.CreateDirectory(p);return p;}
-  void AddLabel(string text,int x,int y,int w,int h,int size,bool bold){var l=new Label{Text=text,Font=new Font("Segoe UI",size,bold?FontStyle.Bold:FontStyle.Regular)};l.SetBounds(x,y,w,h);Controls.Add(l);}
-  void Btn(Button b,string text,int x,int y,int w,int h,EventHandler action){b.Text=text;b.SetBounds(x,y,w,h);b.Click+=action;Controls.Add(b);}
-  void SetBusy(bool value){busy=value;setup.Enabled=!value && worker==null && usb==null;setup.Text=usb==null?"Set up USBPcap":"USBPcap installed";refresh.Enabled=retry.Enabled=sanitize.Enabled=reportButton.Enabled=!value && worker==null;start.Enabled=!value && worker==null && devices.Items.Count>0;stop.Enabled=!value && worker!=null;devices.Enabled=adapter.Enabled=consent.Enabled=!value && worker==null;add.Enabled=!value && worker!=null;}
+  void SetBusy(bool value){busy=value;setup.Enabled=!value && worker==null && usb==null;setup.Text=usb==null?"Set up USBPcap":"USBPcap installed";refresh.Enabled=retry.Enabled=sanitize.Enabled=reportButton.Enabled=!value && worker==null;start.Enabled=!value && worker==null && devices.SelectedItem is UsbDevice && CaptureIdentity.IsModel(adapterModels.SelectedItem as string);stop.Enabled=!value && worker!=null;devices.Enabled=adapterModels.Enabled=adapter.Enabled=consent.Enabled=!value && worker==null;add.Enabled=!value && worker!=null;}
   void Error(Exception e){status.Text=e.Message;MessageBox.Show(e.Message,"OpenSAAB Collector",MessageBoxButtons.OK,MessageBoxIcon.Information);}
   string FindUsb(){foreach(string path in new[]{Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),@"USBPcap\USBPcapCMD.exe"),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),@"USBPcap\USBPcapCMD.exe"),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),@"Wireshark\extcap\USBPcapCMD.exe")})if(File.Exists(path))return path;return null;}
   async Task RefreshDevices(){SetBusy(true);try{
@@ -100,9 +77,9 @@ namespace OpenSaab.Collector {
     var list=new List<UsbDevice>();string hubs=CaptureEngine.Query(usb,"--extcap-interfaces");
     foreach(Match h in Regex.Matches(hubs,@"(?m)^interface \{value=(\\\\\.\\USBPcap[0-9]+)\}")){
      string hub=h.Groups[1].Value;string data=CaptureEngine.Query(usb,"--extcap-interface "+CaptureEngine.Quote(hub)+" --extcap-config");
-     foreach(string line in data.Split('\n')){var d=Regex.Match(line,@"^value \{arg=\d+\}\{value=(\d+)\}\{display=([^}]+)\}");if(d.Success && !line.Contains("{parent="))list.Add(new UsbDevice{Hub=hub,Address=int.Parse(d.Groups[1].Value),Label=d.Groups[2].Value});}
+     list.AddRange(UsbDevice.ParseConfig(hub,data));
     }return list;
-   });foreach(var d in found)devices.Items.Add(d);status.Text=found.Count>0?"Select the adapter (not a keyboard, camera or other peripheral). Keep it connected during capture.":"No capture devices found. Restart Windows if USBPcap was just installed.";
+   });foreach(var d in found)devices.Items.Add(d);status.Text=found.Count>0?"Select the adapter itself, including when connected through a USB hub. Do not select the hub, mouse or keyboard.":"No capture devices found. Restart Windows if USBPcap was just installed.";
   }catch(Exception e){Error(e);}finally{SetBusy(false);}}
   async Task Install(){SetBusy(true);try{
    status.Text="Downloading the official USBPcap installer…";ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
@@ -114,14 +91,15 @@ namespace OpenSaab.Collector {
    status.Text="If USBPcap was installed, restart Windows and reopen Collector before recording.";
   }catch(Exception e){Error(e);}finally{SetBusy(false);}}
   async Task StartCapture(){if(!consent.Checked){MessageBox.Show("Please acknowledge the capture privacy notice before recording.",Text);return;}var device=devices.SelectedItem as UsbDevice;if(device==null){MessageBox.Show("Select your adapter first.",Text);return;}
+   string model=adapterModels.SelectedItem as string;if(!CaptureIdentity.IsModel(model)){MessageBox.Show("Choose an adapter model first.",Text);return;}
    SetBusy(true);try{
     using(var service=new System.ServiceProcess.ServiceController("OpenSAABCollector")){try{if(service.Status==System.ServiceProcess.ServiceControllerStatus.Running)throw new Exception("The old Collector service is running. Stop it before recording; it has a separate uploader.");}catch(InvalidOperationException){}}
     if(Process.GetProcessesByName("USBPcapCMD").Length>0)throw new Exception("Another USBPcap process is running. Stop it first.");
     if(Process.GetProcessesByName("Tech2Win").Length>0 || Process.GetProcessesByName("emulator").Length>0)throw new Exception("Close Tech2Win before capture so initialization is included.");
     string fresh=await Task.Run(()=>CaptureEngine.Query(usb,"--extcap-interface "+CaptureEngine.Quote(device.Hub)+" --extcap-config"));
-    if(!fresh.Contains("{value="+device.Address+"}{display="+device.Label+"}"))throw new Exception("Device list changed. Refresh and select the adapter again.");
-    captureStarted=DateTime.UtcNow;session=Path.Combine(BaseDir(),captureStarted.ToString("yyyyMMdd-HHmmss")+"-"+Guid.NewGuid().ToString("N").Substring(0,8));Directory.CreateDirectory(session);notes=0;
-    manifest=new Dictionary<string,object>{{"format",1},{"collector_version",Bundle.Version},{"adapter",adapter.Text},{"device_label",device.Label},{"usb_interface",device.Hub},{"usb_address",device.Address},{"started_utc",captureStarted.ToString("o")},{"stopped_utc",""},{"os",Environment.OSVersion.VersionString},{"capture_state","starting"},{"stop_reason",""},{"consent",Bundle.Consent},{"diagnostic_success","not inferred"},{"capture_sha256",""}};
+    if(!UsbDevice.ParseConfig(device.Hub,fresh).Exists(d=>d.Address==device.Address && d.Label==device.Label))throw new Exception("Device list changed. Refresh and select the adapter again.");
+    captureStarted=DateTime.UtcNow;string captureId=CaptureIdentity.CreateId(model,captureStarted);session=Path.Combine(BaseDir(),captureId);Directory.CreateDirectory(session);notes=0;
+    manifest=new Dictionary<string,object>{{"format",1},{"collector_version",Bundle.Version},{"adapter_model",model},{"capture_id",captureId},{"adapter",adapter.Text},{"device_label",device.Label},{"usb_interface",device.Hub},{"usb_address",device.Address},{"started_utc",captureStarted.ToString("o")},{"stopped_utc",""},{"os",Environment.OSVersion.VersionString},{"capture_state","starting"},{"stop_reason",""},{"consent",Bundle.Consent},{"diagnostic_success","not inferred"},{"capture_sha256",""}};
     CaptureEngine.Save(Path.Combine(session,"session.json"),manifest);File.WriteAllText(Path.Combine(session,"actions.jsonl"),"",new UTF8Encoding(false));
     string cfg=Path.Combine(session,"worker.json");CaptureEngine.Save(cfg,new CaptureConfig{Executable=usb,Interface=device.Hub,Address=device.Address,ParentPid=Process.GetCurrentProcess().Id});
     worker=Process.Start(new ProcessStartInfo(Application.ExecutablePath,"--worker "+CaptureEngine.Quote(cfg)){UseShellExecute=false,CreateNoWindow=true});
@@ -139,7 +117,7 @@ namespace OpenSaab.Collector {
    if(!(bool)result["graceful"])throw new Exception("Capture was interrupted. Files retained locally; not uploaded.");
    var summary=await Task.Run(()=>CaptureEngine.Validate(Path.Combine(session,"usb.pcap"),(int)manifest["usb_address"]));
    manifest["capture_sha256"]=Bundle.Hash(Path.Combine(session,"usb.pcap"));CaptureEngine.Save(Path.Combine(session,"session.json"),manifest);
-   status.Text="Saved "+summary.packets+" packets locally. Nothing uploaded.\nUse Sanitize capture or Open saved files before Upload.";
+   status.Text="Saved "+summary.packets+" packets locally as "+(string)manifest["capture_id"]+".\nNothing uploaded. Review or sanitize before Upload.";
   }catch(Exception e){Error(e);}finally{finishing=false;SetBusy(false);}}
   async Task SanitizeSaved(){
    using(var folderDialog=new FolderBrowserDialog{Description="Choose a completed capture. A separate sanitized copy will be created.",SelectedPath=session ?? BaseDir()}){
@@ -164,10 +142,12 @@ namespace OpenSaab.Collector {
   async Task UploadSaved(){using(var dialog=new FolderBrowserDialog{Description="Select the reviewed capture folder to upload",SelectedPath=session ?? BaseDir()}){if(dialog.ShowDialog()!=DialogResult.OK)return;
    string dir=dialog.SelectedPath;
    try{
+    var saved=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(dir,"session.json")));
+    string filename=CaptureIdentity.Filename(saved);
     var report=CaptureSanitizer.VerifyReport(dir);
     if(report!=null){if(SanitizeReportDialog.Show(this,report,true)!=DialogResult.OK)return;}
-    else if(MessageBox.Show("This folder has no sanitization report. Upload its current files privately to OpenSAAB?\n\n"+dir+"\n\nFiles: usb.pcap, session.json and actions.jsonl. They may contain VINs, serials and security data. Choose Cancel to use Sanitize capture or review the files first. Nothing is sent until you confirm.","Confirm upload without sanitization report",MessageBoxButtons.OKCancel,MessageBoxIcon.Information,MessageBoxDefaultButton.Button2)!=DialogResult.OK)return;
-    SetBusy(true);session=dir;status.Text="Checking reviewed files and uploading privately…";string receipt=await Bundle.Upload(dir);status.Text="Upload confirmed: "+receipt.Substring(0,22)+"…\nLocal files and full receipt saved.";
+    else if(MessageBox.Show("This folder has no sanitization report. Upload its current files privately to OpenSAAB?\n\n"+dir+"\n\nPackage: "+filename+"\n\nFiles: usb.pcap, session.json and actions.jsonl. They may contain VINs, serials and security data. Choose Cancel to use Sanitize capture or review the files first. Nothing is sent until you confirm.","Confirm upload without sanitization report",MessageBoxButtons.OKCancel,MessageBoxIcon.Information,MessageBoxDefaultButton.Button2)!=DialogResult.OK)return;
+    SetBusy(true);session=dir;status.Text="Uploading "+filename+" privately…";string receipt=await Bundle.Upload(dir);status.Text="Uploaded "+filename+".\nReceipt: "+receipt.Substring(0,22)+"… Full receipt saved locally.";
    }catch(Exception e){Error(e);}finally{SetBusy(false);}}}
  }
 }

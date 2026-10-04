@@ -37,6 +37,13 @@ class SanitizeTest {
   var keep=CaptureSanitizer.Create(source,options);Check(keep.Report.known_vin_matches==5&&keep.Report.computer_name_matches==5,"Retained notes and descriptions have matching identifiers masked");
   Capture(pcap,new List<byte[]>{Encoding.ASCII.GetBytes("ordinary payload")});CaptureEngine.Save(meta,Metadata(pcap));File.WriteAllText(notes,"");
   var zero=CaptureSanitizer.Create(source,new SanitizeOptions());Check(zero.Report.known_vin_matches==0&&zero.Report.vin_candidate_matches==0&&zero.Report.Summary().Contains("does not certify"),"Zero-hit report does not claim anonymity");
+  var labelled=Metadata(pcap);labelled["adapter_model"]="Mongoose";labelled["capture_id"]="OpenSAAB_Mongoose_20260925_000000Z_abcdef01";CaptureEngine.Save(meta,labelled);
+  var modelCopy=CaptureSanitizer.Create(source,new SanitizeOptions());
+  var modelMeta=new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(modelCopy.Folder,"session.json")));
+  Check((string)modelMeta["adapter"]=="" && (string)modelMeta["device_label"]=="" && (string)modelMeta["adapter_model"]=="Mongoose" && (string)modelMeta["capture_id"]==(string)labelled["capture_id"],"Removing descriptions preserves contributor-selected family and capture identity");
+  Check(Path.GetFileName(Bundle.Build(modelCopy.Folder))==(string)labelled["capture_id"]+".zip","Sanitized copy retains the adapter-labelled package name");
+  labelled.Remove("capture_id");CaptureEngine.Save(meta,labelled);Check(Reject(()=>CaptureSanitizer.Create(source,new SanitizeOptions())),"Sanitizer rejects partial adapter identity");
+  CaptureEngine.Save(meta,Metadata(pcap));
   int directories=Directory.GetDirectories(root).Length;File.WriteAllText(pcap,"broken");Check(Reject(()=>CaptureSanitizer.Create(source,options))&&Directory.GetDirectories(root).Length==directories,"Malformed input leaves no misleading sanitized folder");
   Check(Reject(()=>CaptureSanitizer.Create(source,new SanitizeOptions{Vin="short"})),"Invalid known VIN rejected");
   return 0;

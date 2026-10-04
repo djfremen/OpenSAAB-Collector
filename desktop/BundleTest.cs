@@ -25,6 +25,14 @@ class BundleTest {
   }
   Check(File.ReadAllText(meta)==originalMetadata,"Review source metadata is not overwritten");
   Bundle.Build(dir);Check(Bundle.Hash(zip)==reviewed,"Unchanged retry creates byte-identical bundle");
+  Check(Path.GetFileName(zip)=="capture.zip","Legacy capture filename remains compatible");
+  data["adapter_model"]="Mongoose";data["capture_id"]="OpenSAAB_Mongoose_20261004_073025Z_abcdef01";data["started_utc"]="2026-10-04T07:30:25Z";CaptureEngine.Save(meta,data);
+  string labelled=Bundle.Build(dir),labelledHash=Bundle.Hash(labelled);
+  Check(Path.GetFileName(labelled)==(string)data["capture_id"]+".zip","Reviewed adapter identity drives the package name");
+  using(var z=ZipFile.OpenRead(labelled)){var uploaded=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(Read(z,"session.json"));Check((string)uploaded["adapter_model"]=="Mongoose" && (string)uploaded["capture_id"]==(string)data["capture_id"] && z.Entries.Count==3,"Uploaded metadata retains the selected model and exact identity");}
+  Check(Bundle.Build(dir)==labelled && Bundle.Hash(labelled)==labelledHash,"Labelled retry preserves both name and bytes");
+  data["adapter_model"]="Nano";CaptureEngine.Save(meta,data);bool identityRejected=false;try{Bundle.Build(dir);}catch{identityRejected=true;}Check(identityRejected,"Changing model without matching capture identity cannot relabel a capture");
+  data["adapter_model"]="Mongoose";CaptureEngine.Save(meta,data);
   File.WriteAllText(capture,"invalid edited capture");bool rejected=false;try{Bundle.Build(dir);}catch{rejected=true;}
   Check(rejected,"Invalid edited PCAP fails instead of reusing old ZIP");
   Capture(capture,3);data["capture_state"]="interrupted";CaptureEngine.Save(meta,data);rejected=false;try{Bundle.Build(dir);}catch{rejected=true;}Check(rejected,"Interrupted capture is rejected");

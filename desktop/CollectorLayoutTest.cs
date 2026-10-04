@@ -1,0 +1,85 @@
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Reflection;
+using System.Windows.Forms;
+using OpenSaab.Collector;
+
+// Pure Windows UI layout tests. No form is shown: the Shown/USB refresh event,
+// capture worker, installer, keyboard launcher and network are never invoked.
+public static class CollectorLayoutTest {
+ static void Require(bool condition,string message){if(!condition)throw new Exception(message);}
+ static Control Find(Control parent,string name){var found=parent.Controls.Find(name,true);Require(found.Length==1,"Expected one control: "+name);return found[0];}
+ static IEnumerable<Control> Descendants(Control parent){foreach(Control child in parent.Controls){yield return child;foreach(var nested in Descendants(child))yield return nested;}}
+ static void Layout(Control control){control.PerformLayout();foreach(Control child in control.Controls)Layout(child);}
+ static void Settle(Form form){for(int i=0;i<8;i++){Layout(form);Application.DoEvents();}}
+ static void Resize(Form form,Size size){form.ClientSize=size;var handle=form.Handle;Settle(form);}
+ static void ButtonsFit(Form form){
+  foreach(var control in Descendants(form))if(control is Button){
+   Require(control.Height>=44,"Button touch target too short: "+control.Name);
+   Require(control.Width>=120,"Button touch target too narrow: "+control.Name);
+   Require(control.Left>=0 && control.Right<=control.Parent.ClientSize.Width,"Button clipped horizontally: "+control.Name);
+   Require(control.Top>=0 && control.Bottom<=control.Parent.ClientSize.Height,"Button clipped vertically: "+control.Name);
+  }
+ }
+ static void Reach(Form form,Panel viewport,string name){
+  var button=Find(form,name);viewport.ScrollControlIntoView(button);Settle(form);
+  var bounds=viewport.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
+  Require(bounds.Top>=0 && bounds.Bottom<=viewport.ClientSize.Height,"Scrolled action remains out of view: "+name);
+  Require(bounds.Left>=0 && bounds.Right<=viewport.ClientSize.Width,"Scrolled action exceeds viewport: "+name);
+ }
+ static void MainLayout(){
+  using(var form=new CollectorForm()){
+   var timer=(Timer)typeof(CollectorForm).GetField("timer",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(form);timer.Stop();
+   try{
+    var model=(ComboBox)Find(form,"adapterModels");var device=(ComboBox)Find(form,"devices");var start=(Button)Find(form,"start");
+    Require(model.DropDownStyle==ComboBoxStyle.DropDownList && device.DropDownStyle==ComboBoxStyle.DropDownList,"Selectors permit arbitrary values");
+    Require(model.Items.Count==5 && model.SelectedIndex==0,"Required model placeholder missing");
+    string[] expected={"Chipsoft","MDI","Mongoose","Nano"};for(int i=0;i<expected.Length;i++)Require((string)model.Items[i+1]==expected[i],"Model catalog changed");
+    Require(!start.Enabled && !((CheckBox)Find(form,"captureConsent")).Checked,"Default capture must be unselected and unacknowledged");
+    model.SelectedIndex=1;Require(!start.Enabled,"Model alone enables capture");
+    device.Items.Add(new UsbDevice{Hub=@"\\.\USBPcap1",Address=1,Label="Synthetic adapter for UI test"});device.SelectedIndex=0;
+    Require(start.Enabled,"Choosing physical device after model leaves capture disabled");
+    model.SelectedIndex=0;Require(!start.Enabled,"Placeholder enables capture");
+    device.SelectedIndex=-1;model.SelectedIndex=4;Require(!start.Enabled,"Missing physical device enables capture");
+    model.SelectedIndex=0;device.SelectedIndex=0;Require(!start.Enabled,"Device alone enables capture");
+    model.SelectedIndex=2;Require(start.Enabled,"Choosing model after physical device leaves capture disabled");
+    var setBusy=typeof(CollectorForm).GetMethod("SetBusy",BindingFlags.Instance|BindingFlags.NonPublic);setBusy.Invoke(form,new object[]{true});
+    Require(!start.Enabled && !device.Enabled && !model.Enabled,"Busy capture controls remain enabled");setBusy.Invoke(form,new object[]{false});
+    foreach(var size in new[]{new Size(800,600),new Size(360,360)}){
+     Resize(form,size);ButtonsFit(form);var viewport=(Panel)Find(form,"collectorViewport");
+     Require(viewport.AutoScroll && !viewport.HorizontalScroll.Visible,"Main layout needs horizontal scrolling");
+     Require(Find(form,"adapterDetails").Height>=44 && Find(form,"stepNote").Height>=44,"Text entry targets too short");
+     foreach(string name in new[]{"start","stop","sanitize","viewReport","upload","donate"})Reach(form,viewport,name);
+     if(size.Width==360)Require(Find(form,"stop").Top>Find(form,"start").Top,"Narrow action row failed to wrap");
+    }
+   }finally{timer.Dispose();}
+  }
+ }
+ static void SanitizeLayout(){
+  using(var form=new SanitizeDialog()){
+   Require(form.Options.RemoveNotes && form.Options.RemoveDescriptions,"Sanitization defaults changed");
+   Require(form.Options.ComputerName==Environment.MachineName,"Computer-name default changed");
+   foreach(var size in new[]{new Size(800,600),new Size(360,360)}){
+    Resize(form,size);ButtonsFit(form);var viewport=(Panel)Find(form,"sanitizeViewport");
+    Require(viewport.AutoScroll && !viewport.HorizontalScroll.Visible,"Sanitize layout needs horizontal scrolling");
+    Reach(form,viewport,"createSanitizedCopy");Reach(form,viewport,"cancelSanitization");
+   }
+  }
+  var create=typeof(SanitizeReportDialog).GetMethod("Create",BindingFlags.Static|BindingFlags.NonPublic);
+  foreach(bool upload in new[]{false,true})using(var form=(Form)create.Invoke(null,new object[]{new SanitizeReport(),upload})){
+   Require(form.AcceptButton==null,"Enter must not authorize upload");
+   foreach(var size in new[]{new Size(800,600),new Size(360,360)}){
+    Resize(form,size);ButtonsFit(form);
+    foreach(string name in upload?new[]{"closeReport","uploadReviewedCopy"}:new[]{"closeReport"}){
+     var button=Find(form,name);var bounds=form.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
+     Require(form.ClientRectangle.Contains(bounds),"Report action is outside the window: "+name);
+    }
+   }
+  }
+ }
+ [STAThread]public static int Main(){
+  try{Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);MainLayout();SanitizeLayout();Console.WriteLine("Collector layout and adapter selection tests passed; no hardware or network used.");return 0;}
+  catch(Exception e){Console.Error.WriteLine(e.Message);return 1;}
+ }
+}

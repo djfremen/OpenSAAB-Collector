@@ -1,5 +1,6 @@
 """Private USBPcap submissions. No adapter commands, shims or public downloads."""
 import asyncio
+import datetime as dt
 import hashlib
 import io
 import json
@@ -14,7 +15,23 @@ from starlette.concurrency import run_in_threadpool
 
 MAX_BYTES = 64 * 1024 * 1024
 CONSENT = 'collector-capture-v1'
-VERSION = '0.5.0'
+VERSION = '0.5.6'
+ADAPTER_MODELS = ('Chipsoft', 'MDI', 'Mongoose', 'Nano')
+CAPTURE_ID = re.compile(r'OpenSAAB_(Chipsoft|MDI|Mongoose|Nano)_([0-9]{8}_[0-9]{6})Z_[a-f0-9]{8}')
+
+
+def capture_identity(session):
+    """User-selected model and safe filename, not automatic hardware qualification."""
+    model = session['adapter_model']
+    match = CAPTURE_ID.fullmatch(session['capture_id'])
+    if model not in ADAPTER_MODELS or not match or match[1] != model:
+        raise ValueError('Invalid capture identity')
+    started = dt.datetime.fromisoformat(session['started_utc'].replace('Z', '+00:00'))
+    named = dt.datetime.strptime(match[2], '%Y%m%d_%H%M%S')
+    if started.tzinfo is None or started.utcoffset() != dt.timedelta(0) or started.replace(tzinfo=None, microsecond=0) != named:
+        raise ValueError('Capture identity does not match start time')
+    return {'adapter_model': model, 'capture_id': session['capture_id'],
+            'capture_filename': session['capture_id'] + '.zip'}
 
 
 def validate_pcap(data, address):
@@ -62,7 +79,8 @@ def validate_bundle(body):
         session = json.loads(z.read('session.json'))
         fields = {'format','collector_version','adapter','device_label','usb_interface','usb_address',
                   'started_utc','stopped_utc','os','capture_state','stop_reason','consent','diagnostic_success','capture_sha256'}
-        if not isinstance(session, dict) or set(session) != fields:
+        identity_fields = {'adapter_model', 'capture_id'}
+        if not isinstance(session, dict) or set(session) not in (fields, fields | identity_fields):
             raise ValueError('Invalid session fields')
         if session['format'] != 1 or session['consent'] != CONSENT or session['capture_state'] != 'stopped_gracefully':
             raise ValueError('Incomplete capture or missing consent')
@@ -86,6 +104,8 @@ def validate_bundle(body):
         if hashlib.sha256(capture).hexdigest() != session['capture_sha256']:
             raise ValueError('Capture checksum mismatch')
         summary = validate_pcap(capture, address)
+        if identity_fields <= set(session):
+            summary.update(capture_identity(session))
     return summary
 
 
@@ -117,11 +137,18 @@ def make_collector_router(storage, bucket=lambda:'opensaab-capture'):
             raise HTTPException(503,'Private storage unavailable; keep your local copy')
         receipt='OSCAP-'+digest
         key='collector/v1/'+receipt+'.zip'
+        metadata={'sha256':digest,'consent':CONSENT}
+        options={}
+        if 'capture_id' in summary:
+            metadata.update({k:summary[k] for k in ('adapter_model','capture_id','capture_filename')})
+            options['ContentDisposition']='attachment; filename="'+summary['capture_filename']+'"'
         try:
-            client.put_object(Bucket=bucket(),Key=key,Body=body,ContentType='application/zip',Metadata={'sha256':digest,'consent':CONSENT})
+            client.put_object(Bucket=bucket(),Key=key,Body=body,ContentType='application/zip',Metadata=metadata,**options)
             stored=client.head_object(Bucket=bucket(),Key=key)
             if stored.get('ContentLength')!=len(body) or stored.get('Metadata',{}).get('sha256')!=digest:
                 raise RuntimeError('Storage verification failed')
+            if 'capture_id' in summary and (any(stored.get('Metadata',{}).get(k)!=metadata[k] for k in ('adapter_model','capture_id','capture_filename')) or stored.get('ContentDisposition')!=options['ContentDisposition']):
+                raise RuntimeError('Capture identity verification failed')
         except Exception:
             raise HTTPException(503,'Upload was not confirmed; keep your local copy and retry') from None
         return {'stored':True,'receipt':receipt,'sha256':digest,'bytes':len(body),'summary':summary}

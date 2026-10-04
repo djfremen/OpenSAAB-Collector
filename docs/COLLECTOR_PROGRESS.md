@@ -2,9 +2,9 @@
 
 Generated from `COLLECTOR_PROGRESS.json`; edit that register, then run `python3 tools/collector_progress.py`. Never edit this projection directly.
 
-Updated: 2026-10-02 18:15 PDT. Public preview: **0.5.3-preview.1**; owner research: **0.5.4-owner.2**.
+Updated: 2026-10-04 PDT / adapter-labelled 0.5.6 candidate. Public preview: **0.5.5-preview.1**; owner research: **0.5.4-owner.2**.
 
-Collector capture tooling and private Nano research. October 2: direct Windows warm VIN and adapter reboot verified; independent cold initialization remains unresolved. Diagnostic transports and model advice require separate qualification.
+Collector 0.5.5 remains the published preview. 0.5.6 adds the required Chipsoft/MDI/Mongoose/Nano selector, model-labelled UTC folders/ZIPs and metadata, compatible server validation and tablet layout. Software checks are in progress; hardware touch and per-adapter qualification remain separate. Nano owner research retains its existing evidence and gaps.
 
 ## Adapter matrix
 
@@ -14,7 +14,7 @@ Public columns refer to the current preview unless explicitly labelled earlier b
 |---|---|---|---|---|---|---|
 | Chipsoft Pro | Earlier build passed | Earlier build passed | Not tested | Earlier build passed | Not tested | Not tested |
 | VCX Nano (exact variant pending) | Not tested | Not tested | Not tested | Not tested | Scoped checks passed | Assessment rejected |
-| Mongoose (exact model pending) | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |
+| MongoosePro GM II | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |
 | GM MDI / MDI 2 | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |
 | Other USB adapters | Not tested | Not tested | Not tested | Not tested | Not tested | Not tested |
 
@@ -34,13 +34,13 @@ Next test: Recover ordinary fresh startup request generation and reply validatio
 
 Complete when: Same exact native artifact starts before vendor software after independently documented loss of both USB and OBD power, reads a wire-verified VIN, cleans up, reopens under the powered state, and repeats from another cold start. Full firmware/info/DTC and public capture/upload retain separate gates.
 
-### Mongoose (exact model pending)
+### MongoosePro GM II
 
-Environment: Windows 8.1 planned; not tested. Evidence: none recorded.
+Environment: Owner-reported Windows 8 Pro x32 tablet via external USB hub; J2534 package v1.2.8.0 reported; firmware and exact Collector executable unknown. Evidence: `mongoose-win8-hub-capture-20261003`.
 
-Next test: First check Windows 8.1 dependencies and USBPcap installation/reboot with the exact model and vendor driver; collect a short working-vendor-session recording.
+Next test: Download 0.5.5 and select MongoosePro GM II itself beneath the existing hub. Repeat initialization/VIN, retain the original, review/sanitize and explicitly upload; verify adapter payloads and stored bytes.
 
-Complete when: Exact build/model/driver/firmware evidence for selection, payload capture, graceful stop, review and confirmed private upload/read-back.
+Complete when: Exact model/build/driver/firmware evidence, Mongoose rather than hub traffic, graceful stop, review and confirmed private upload/read-back. The current hub-only upload does not qualify Mongoose diagnostics.
 
 ### GM MDI / MDI 2
 
@@ -60,6 +60,8 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 
 ## Next actions
 
+- **P1 · in_progress · adapter-labels-056-rollout:** Run native Windows layout/package/sanitizer tests; activate only the compatible Collector server overlay using the current live immutable base; verify private synthetic round-trips before publishing 0.5.6.
+- **P1 · pending · mongoose-hub-picker:** 0.5.5 is published with passing Windows picker regression and verified public assets. Obtain a new MongoosePro GM II capture on Windows 8 Pro x32 with hub/mouse/keyboard; the earlier upload recorded hub controls only.
 - **P1 · done · nano-windows-warm-vin-and-reboot:** Exact private Windows native probe passed warm read-only VIN with independent wire/cleanup evidence and an adapter-reboot acknowledgement. Warm readiness still requires vendor startup; public Nano support remains unqualified.
 - **P1 · done · nano-direct-beep:** Own sender verified Nano identity and two beep success replies with no VCX library loaded; original Collector captures independently validate exchange. Audibility and cold start are still unverified.
 - **P1 · pending · nano-read-pool-coverage:** Seven-recording comparison and JEV routing favor receive-pool lifecycle inspection. Ten pending IN reads occur even with fully paired completions; do not treat them as proof of loss/crash. Whole-vehicle reference and loss counters still required for bounded CAN coverage.
@@ -67,7 +69,7 @@ Complete when: Each model needs an exact-artifact case. A generic USB capture ca
 - **P1 · done · owner-gui:** Installed owner.2 picker, local summary, consent cancellation, cached rejection and unfinished-capture handling verified on EliteBook; no new model call or vehicle command.
 - **P1 · pending · nano-firmware-policy:** Private Windows warm VIN is qualified from our native probe. Original-firmware Engine/info/DTC remain separately pending; bench missing-module and vehicle-selection limitations are retained. Review the existing narrow data-definition guard before changing policy.
 - **P1 · pending · nano-cold:** Controlled full USB/OBD power-loss test completed and direct channel opening failed before vehicle TX. Independent cold initialization is still unresolved. Implement our portable initializer and qualify two separate full-power-loss starts before any vendor program, followed by VIN and cleanup.
-- **P1 · pending · public-roundtrip:** Qualify the public 0.5.3 live Chipsoft capture/review/sanitized-upload/read-back path.
+- **P1 · pending · public-roundtrip:** Qualify public 0.5.5 with a fresh live Chipsoft capture/review/sanitized-upload/read-back; earlier 0.5.0 evidence remains separate.
 - **P2 · pending · adapter-onboarding:** Collect exact-model Windows/driver/firmware profiles for Mongoose, MDI and other adapters; keep statuses untested until evidence exists.
 - **P2 · pending · model-corpus:** Model fact assessments remain rejected, including unsupported dropped-CAN inference. Typed experiment routing succeeds narrowly. Preserve these failures and build labelled missing-evidence/error cases before public advice or accuracy claims.
 
@@ -219,6 +221,30 @@ Source: `92db6ba431c0f03527ac3dd9712bcb18fc2eeedf`. Executable SHA-256: `not rec
 Evidence reference: owner-local: NANO_INDEPENDENT_READINESS_2026-10-02.md; offline input manifest and reviewed results.
 
 - **nano-independent-readiness-boundary-analysis · offline_stopped_capture_and_synthetic_checks · 2026-10-02 PDT · pass_scoped:** Five distinct retained phase recordings were compared without hardware or vendor launch. Three original-startup recordings contain 30 complete adjacent cycles of the narrower three-step startup path; two Manager comparisons contain none. Fresh request payloads vary, and exact equality relationships are preserved privately. Forty-three comparison/evidence tests pass, including synthetic USB decoding and damaged, duplicate, stale and reordered inputs. Existing code extraction lacks the mapped implementation bodies. Gap: Order, lengths, replies and variability do not recover request generation/validation or prove necessity/sufficiency. Native initializer remains unimplemented. Rejected UI-startup evidence stays rejected; warm baseline and ten unmatched USB completions/ten pending reads per phase remain explicit.
+
+### 0.5.3 (contributor reported; exact executable unverified) · public
+
+Source: `not recorded`. Executable SHA-256: `not recorded`.
+
+Evidence reference: private-owner: Windows 8 Mongoose hub upload review, October 3 PDT.
+
+- **mongoose-win8-hub-capture-20261003 · contributor_capture_wrong_device · 2026-10-03 18:48 PDT arrival · failed:** Owner reports Windows 8 Pro x32 tablet, external hub with mouse/keyboard and MongoosePro GM II. Session reports Collector 0.5.3 and J2534 package v1.2.8.0. Private R2 read-back verified the stored bundle digest. Notes supplied: ECM VIN read attempted, no diagnostic result. The selected Generic USB Hub capture contains six control records, zero bulk/interrupt traffic and no Mongoose exchange. Source inspection confirmed that the picker excludes enabled physical devices behind hubs. Local parser regression and Windows executable cross-compile pass; source fix is not published. Gap: Contributor executable digest/source, firmware, Tech2Win driver version, original capture, sanitizer report and vehicle/context unknown. Graceful stop is recorded in metadata only. Mongoose diagnostics, live sanitizer behavior and corrected Windows 8/hardware capture remain unqualified.
+
+### 0.5.5-preview.1 · public
+
+Source: `640f1e5510afd81366658ee3719ca010705b437e`. Executable SHA-256: `1a5d7f0c01a8d5dc82d4ad259fa66b988e28147c44c68c0df84abf82c911fa85`.
+
+Evidence reference: GitHub PR #6; Windows CI run 37182812971; private publication receipt; docs/HUB_DEVICE_SELECTION_0.5.5.md.
+
+- **public-055-hub-picker-ci · windows_ci_and_verified_publication · 2026-10-03 23:28 PDT publication · pass_scoped:** Merged PR #6 has the same source tree as the tested PR executable. Windows CI passed the six new physical-device picker regression checks plus existing bundle/sanitizer checks; all ten server tests passed. The four public assets were downloaded anonymously and matched their staged SHA-256 values. Parser preserves devices behind one or two external hubs while excluding disabled/composite display children. Gap: No fresh Windows 8 Pro x32/Mongoose or Chipsoft live capture-to-reviewed-upload round-trip for 0.5.5. CI selection fixtures are not hardware diagnostics; the earlier hub-only failure remains preserved.
+
+### 0.5.6 candidate · public
+
+Source: `not recorded`. Executable SHA-256: `not recorded`.
+
+Evidence reference: docs/ADAPTER_LABELS_0.5.6.md; desktop/test.ps1; server/test_collector_api.py.
+
+- **adapter-labels-056-offline · synthetic_software · 2026-10-04 PDT · pass_scoped:** Four-model identity and legacy naming tests, USB picker checks and C#5/.NET Framework cross-compilation passed on the Mini. Server fake-store tests pass for legacy and labelled submissions, UTC/model validation and corrupted private metadata. Native Windows CI and service activation are the next rollout gates. Gap: No actual tablet digitizer test or new Chipsoft/MDI/Mongoose/Nano hardware capture/diagnostic qualification. This source candidate is not yet the public release.
 
 ## Limits
 

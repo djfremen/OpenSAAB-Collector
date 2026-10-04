@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 LABELS = {"historical_pass": "Earlier build passed", "pass_scoped": "Scoped checks passed",
-          "not_tested": "Not tested", "rejected": "Assessment rejected"}
+          "not_tested": "Not tested", "rejected": "Assessment rejected", "failed": "Failed"}
 
 
 def validate(data):
