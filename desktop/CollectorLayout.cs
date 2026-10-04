@@ -86,9 +86,28 @@ namespace OpenSaab.Collector {
  internal static class CollectorTouchUi {
   internal static TableLayoutPanel ScrollContent(Form form,string name){
    var viewport=new Panel{Dock=DockStyle.Fill,AutoScroll=true,Name=name,TabStop=false};form.Controls.Add(viewport);
-   var content=new TableLayoutPanel{ColumnCount=1,RowCount=0,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,Dock=DockStyle.Top,Padding=new Padding(16),Margin=Padding.Empty,Name=name+"Content"};
+   // The viewport owns the content's scrolled location. Dock.Top would relayout
+   // it at the top again when a nested row changes, undoing the scroll offset.
+   var content=new TableLayoutPanel{ColumnCount=1,RowCount=0,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,Anchor=AnchorStyles.Top|AnchorStyles.Left,Padding=new Padding(16),Margin=Padding.Empty,Name=name+"Content"};
    content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));viewport.Controls.Add(content);
-   viewport.Layout+=delegate{WrapText(content,Math.Max(120,viewport.ClientSize.Width-32-(viewport.VerticalScroll.Visible?SystemInformation.VerticalScrollBarWidth:0)));};
+   bool updating=false;
+   Action update=delegate{
+    if(updating || viewport.IsDisposed)return;updating=true;
+    try{
+     // ClientSize already excludes a visible scrollbar. Constrain only width;
+     // the full content height defines the vertical scrollbar's real range.
+     int width=Math.Max(1,viewport.ClientSize.Width);var constraint=new Size(width,0);
+     content.SuspendLayout();
+     if(content.MinimumSize!=constraint)content.MinimumSize=constraint;
+     if(content.MaximumSize!=constraint)content.MaximumSize=constraint;
+     if(content.Width!=width)content.Width=width;
+     content.ResumeLayout(true);
+     WrapText(content,Math.Max(120,width-content.Padding.Horizontal));content.PerformLayout();
+     int height=content.GetPreferredSize(new Size(width,0)).Height;if(content.Height!=height)content.Height=height;
+     var extent=new Size(0,content.Height);if(viewport.AutoScrollMinSize!=extent)viewport.AutoScrollMinSize=extent;
+    }finally{updating=false;}
+   };
+   viewport.Layout+=delegate{update();};content.SizeChanged+=delegate{update();};
    return content;
   }
   internal static void Add(TableLayoutPanel content,Control control){

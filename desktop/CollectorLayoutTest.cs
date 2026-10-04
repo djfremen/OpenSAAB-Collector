@@ -18,7 +18,11 @@ public static class CollectorLayoutTest {
  static void Layout(Control control){control.PerformLayout();foreach(Control child in control.Controls)Layout(child);}
  static void Settle(Form form){for(int i=0;i<8;i++){Layout(form);Application.DoEvents();}}
  static void Resize(Form form,Size size){form.ClientSize=size;if(!form.Visible)form.Show();Settle(form);}
- static string Geometry(Form form,Control control){return " window="+form.ClientSize+" control="+control.Bounds+" parent="+control.Parent.Name+"/"+control.Parent.ClientRectangle;}
+ static string Geometry(Form form,Control control){
+  string value=" window="+form.ClientSize;
+  for(Control current=control;current!=null && current!=form;current=current.Parent)value+=" ["+current.Name+"/"+current.GetType().Name+" bounds="+current.Bounds+" client="+current.ClientRectangle+"]";
+  return value;
+ }
  static void Snapshot(Form form,string label){
   using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,form.Size));bitmap.Save(Path.Combine(Path.GetDirectoryName(Application.ExecutablePath),label+".png"),ImageFormat.Png);}
  }
@@ -33,7 +37,7 @@ public static class CollectorLayoutTest {
  static void Reach(Form form,Panel viewport,string name){
   var button=Find(form,name);viewport.ScrollControlIntoView(button);Settle(form);
   var bounds=viewport.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
-  string geometry=Geometry(form,button)+" viewport="+viewport.ClientRectangle+" translated="+bounds+" scroll="+viewport.AutoScrollPosition;
+  string geometry=Geometry(form,button)+" viewport="+viewport.ClientRectangle+" translated="+bounds+" scroll="+viewport.AutoScrollPosition+" extent="+viewport.AutoScrollMinSize+" display="+viewport.DisplayRectangle;
   Require(bounds.Top>=0 && bounds.Bottom<=viewport.ClientSize.Height,"Scrolled action remains out of view: "+name+geometry);
   Require(bounds.Left>=0 && bounds.Right<=viewport.ClientSize.Width,"Scrolled action exceeds viewport: "+name+geometry);
  }
