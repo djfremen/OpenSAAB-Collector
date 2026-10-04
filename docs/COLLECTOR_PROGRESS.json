@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "updated_pacific": "2026-10-04 PDT / adapter-labelled 0.5.6 candidate",
-  "scope": "Collector 0.5.5 remains the published preview. 0.5.6 adds the required Chipsoft/MDI/Mongoose/Nano selector, model-labelled UTC folders/ZIPs and metadata, compatible server validation and tablet layout. Software checks are in progress; hardware touch and per-adapter qualification remain separate. Nano owner research retains its existing evidence and gaps.",
-  "public_version": "0.5.5-preview.1",
+  "updated_pacific": "2026-10-04 01:03 PDT",
+  "scope": "Collector 0.5.6-preview.1 is published with required Chipsoft/MDI/Mongoose/Nano provenance, model-labelled UTC folders/ZIPs and metadata, compatible live private upload validation and tablet layout. Native Windows software checks and legacy/labelled synthetic server read-backs passed. Actual tablet touch, on-screen keyboard launching and current-build per-adapter hardware qualification remain separate pending tests. Nano owner research retains its existing evidence and gaps.",
+  "public_version": "0.5.6-preview.1",
   "owner_version": "0.5.4-owner.2",
   "artifacts": [
     {
@@ -156,6 +156,14 @@
       "source": null,
       "sha256": null,
       "evidence": "docs/ADAPTER_LABELS_0.5.6.md; desktop/test.ps1; server/test_collector_api.py"
+    },
+    {
+      "id": "public-056-main",
+      "version": "0.5.6-preview.1",
+      "audience": "public",
+      "source": "59c7bb14f5d3e9bda3b4fa425573bde60bdccda3",
+      "sha256": "0da50a8e944b1acd4d94ac8d1e33b8a097352138a833f036de15b2d3cb3fc316",
+      "evidence": "https://github.com/djfremen/OpenSAAB-Collector/releases/tag/v0.5.6-preview.1; https://github.com/djfremen/OpenSAAB-Collector/actions/runs/37187449018; docs/ADAPTER_LABELS_0.5.6.md"
     }
   ],
   "cases": [
@@ -538,6 +546,26 @@
       "result": "pass_scoped",
       "observation": "Four-model identity and legacy naming tests, USB picker checks and C#5/.NET Framework cross-compilation passed on the Mini. Server fake-store tests pass for legacy and labelled submissions, UTC/model validation and corrupted private metadata. Native Windows CI and service activation are the next rollout gates.",
       "gaps": "No actual tablet digitizer test or new Chipsoft/MDI/Mongoose/Nano hardware capture/diagnostic qualification. This source candidate is not yet the public release."
+    },
+    {
+      "id": "adapter-labels-056-windows-release",
+      "artifact": "public-056-main",
+      "adapter": null,
+      "kind": "synthetic_software",
+      "date_pacific": "2026-10-04 PDT",
+      "result": "pass_scoped",
+      "observation": "Native Windows CI built this exact executable and passed identity, USB picker, fresh bundle/unchanged retry, sanitizer label preservation and shown-form layout/scrolling checks at 800x600 and 360x360. Both selector orders, missing choices and busy locking are covered. All four public release assets were downloaded anonymously and matched the published source files. Earlier candidate test runs exposed focus-driven scroll behavior in the test setup; revised immediate bounds and separate native scrollbar checks passed on both PR and main.",
+      "gaps": "No actual Windows 8 Pro x32 digitizer or on-screen keyboard launch test, and no new live adapter/vehicle capture. Dropdown choices declare contributor provenance; they do not establish diagnostic support."
+    },
+    {
+      "id": "adapter-labels-056-live-server",
+      "artifact": "public-056-main",
+      "adapter": null,
+      "kind": "synthetic_software",
+      "date_pacific": "2026-10-04 PDT",
+      "result": "pass_scoped",
+      "observation": "All 35 server tests passed. Compatible API 0.5.6 became live through a two-file overlay preserving existing runtime configuration and website. Clearly marked legacy and Mongoose-labelled software fixtures uploaded successfully and were independently retrieved from private storage with byte-identical ZIPs, content-hash receipts and the exact declared filename metadata. Confirmed retry of the legacy fixture retained its object key.",
+      "gaps": "These two retained fixtures contain no adapter/vehicle traffic and qualify no Mongoose hardware. An unsigned S3 request returned HTTP400 without object bytes; that request did not independently verify public bucket configuration. Private deployment/upload receipts stay outside this public register."
     }
   ],
   "adapters": [
@@ -671,14 +699,14 @@
     {
       "id": "adapter-labels-056-rollout",
       "priority": "P1",
-      "state": "in_progress",
-      "action": "Run native Windows layout/package/sanitizer tests; activate only the compatible Collector server overlay using the current live immutable base; verify private synthetic round-trips before publishing 0.5.6."
+      "state": "done",
+      "action": "Collector 0.5.6-preview.1 published from passing native main CI. Compatible upload service is live; legacy and labelled synthetic packages were verified against private stored bytes and filename metadata. Public executable and documentation downloads matched all checksums. Website update uses only its Collector section."
     },
     {
       "id": "mongoose-hub-picker",
       "priority": "P1",
       "state": "pending",
-      "action": "0.5.5 is published with passing Windows picker regression and verified public assets. Obtain a new MongoosePro GM II capture on Windows 8 Pro x32 with hub/mouse/keyboard; the earlier upload recorded hub controls only."
+      "action": "0.5.6 includes the published 0.5.5 USB hub picker fix and larger scrolling controls. Obtain a new MongoosePro GM II capture on Windows 8 Pro x32 with hub/mouse/keyboard; the earlier upload recorded hub controls only. Separately verify actual touch and keyboard-button behavior on that tablet."
     },
     {
       "id": "nano-windows-warm-vin-and-reboot",
@@ -726,7 +754,7 @@
       "id": "public-roundtrip",
       "priority": "P1",
       "state": "pending",
-      "action": "Qualify public 0.5.5 with a fresh live Chipsoft capture/review/sanitized-upload/read-back; earlier 0.5.0 evidence remains separate."
+      "action": "Qualify public 0.5.6 with a fresh live Chipsoft capture/review/sanitized-upload/read-back; general synthetic software checks and earlier 0.5.0 hardware evidence remain separate."
     },
     {
       "id": "adapter-onboarding",

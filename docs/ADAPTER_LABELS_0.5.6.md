@@ -61,3 +61,27 @@ Windows 8 Pro x32/Mongoose live capture, actual digitizer input and each adapter
 diagnostic success remain separate pending tests. The existing 0.5.5 hub picker
 fix stays in this build. Nano research is not Chipsoft implementation or MDI
 qualification. Dropdown membership alone establishes none of these capabilities.
+
+## Published artifact and completed rollout
+
+`v0.5.6-preview.1` is built from `59c7bb14f5d3e9bda3b4fa425573bde60bdccda3`.
+[Native Windows main CI](https://github.com/djfremen/OpenSAAB-Collector/actions/runs/37187449018)
+passed identity, picker, bundle/retry, sanitizer and native layout/scrolling tests;
+all 35 server tests passed. The released executable SHA-256 is
+`0da50a8e944b1acd4d94ac8d1e33b8a097352138a833f036de15b2d3cb3fc316`.
+The [public release](https://github.com/djfremen/OpenSAAB-Collector/releases/tag/v0.5.6-preview.1)
+contains the executable, workflow README, privacy notice and checksums. Anonymous
+downloads of all four assets were independently verified byte for byte.
+
+The compatible service is live. Two clearly marked synthetic fixtures, one
+legacy and one Mongoose-labelled, were uploaded and independently retrieved from
+private storage. Stored ZIP bytes, receipts, model/id metadata and labelled
+download filename matched. No adapter or vehicle was used in these checks.
+Deployment and round-trip receipts are held privately under
+`~/.local/share/opensaab/collector-labels-20261004/`; public asset verification
+is under `~/.local/share/opensaab/collector-releases/v0.5.6-preview.1/`.
+
+Native UI tests establish control size, clipping, keyboard focus and scroll
+reachability. Actual touchscreen input and launching Windows' on-screen keyboard
+on the contributor's Windows 8 x32 tablet remain pending. Prior hub-only capture
+evidence is preserved, and a fresh Mongoose diagnostic capture is still needed.
