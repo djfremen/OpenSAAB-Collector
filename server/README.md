@@ -49,6 +49,12 @@ private download that honors this header can use the friendly filename. HEAD
 verification checks those identity fields and the disposition before success.
 Legacy uploads retain their original metadata and response shape.
 
+`GET /api/collector/status` advertises API version `0.5.6`,
+`adapter_labelled_filenames: true` and the four `adapter_models`. A client using
+the new identity fields must verify this capability before upload; an older
+server's successful status response alone is insufficient. This API version is
+not a claim that every selected adapter is supported or qualified.
+
 The actual object key stays `collector/v1/OSCAP-<sha256>.zip`, and the receipt is
 still the SHA-256 of the exact uploaded ZIP bytes. Identical retries therefore
 reuse the same key. Friendly names are metadata/download hints, not alternate

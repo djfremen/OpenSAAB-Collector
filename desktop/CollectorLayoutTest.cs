@@ -1,35 +1,44 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Imaging;
+using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 using OpenSaab.Collector;
 
-// Pure Windows UI layout tests. No form is shown: the Shown/USB refresh event,
-// capture worker, installer, keyboard launcher and network are never invoked.
+// Real Windows UI layout tests. The test-only subclass suppresses OnShown so
+// showing the collector cannot invoke its production USB refresh handler.
+// Capture workers, installers, keyboard launchers and network are not invoked.
 public static class CollectorLayoutTest {
+ sealed class TestCollectorForm:CollectorForm {protected override void OnShown(EventArgs e){}}
  static void Require(bool condition,string message){if(!condition)throw new Exception(message);}
  static Control Find(Control parent,string name){var found=parent.Controls.Find(name,true);Require(found.Length==1,"Expected one control: "+name);return found[0];}
  static IEnumerable<Control> Descendants(Control parent){foreach(Control child in parent.Controls){yield return child;foreach(var nested in Descendants(child))yield return nested;}}
  static void Layout(Control control){control.PerformLayout();foreach(Control child in control.Controls)Layout(child);}
  static void Settle(Form form){for(int i=0;i<8;i++){Layout(form);Application.DoEvents();}}
- static void Resize(Form form,Size size){form.ClientSize=size;var handle=form.Handle;Settle(form);}
+ static void Resize(Form form,Size size){form.ClientSize=size;if(!form.Visible)form.Show();Settle(form);}
+ static string Geometry(Form form,Control control){return " window="+form.ClientSize+" control="+control.Bounds+" parent="+control.Parent.Name+"/"+control.Parent.ClientRectangle;}
+ static void Snapshot(Form form,string label){
+  using(var bitmap=new Bitmap(form.Width,form.Height)){form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,form.Size));bitmap.Save(Path.Combine(Path.GetDirectoryName(Application.ExecutablePath),label+".png"),ImageFormat.Png);}
+ }
  static void ButtonsFit(Form form){
   foreach(var control in Descendants(form))if(control is Button){
    Require(control.Height>=44,"Button touch target too short: "+control.Name);
    Require(control.Width>=120,"Button touch target too narrow: "+control.Name);
-   Require(control.Left>=0 && control.Right<=control.Parent.ClientSize.Width,"Button clipped horizontally: "+control.Name);
-   Require(control.Top>=0 && control.Bottom<=control.Parent.ClientSize.Height,"Button clipped vertically: "+control.Name);
+   Require(control.Left>=0 && control.Right<=control.Parent.ClientSize.Width,"Button clipped horizontally: "+control.Name+Geometry(form,control));
+   Require(control.Top>=0 && control.Bottom<=control.Parent.ClientSize.Height,"Button clipped vertically: "+control.Name+Geometry(form,control));
   }
  }
  static void Reach(Form form,Panel viewport,string name){
   var button=Find(form,name);viewport.ScrollControlIntoView(button);Settle(form);
   var bounds=viewport.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
-  Require(bounds.Top>=0 && bounds.Bottom<=viewport.ClientSize.Height,"Scrolled action remains out of view: "+name);
-  Require(bounds.Left>=0 && bounds.Right<=viewport.ClientSize.Width,"Scrolled action exceeds viewport: "+name);
+  string geometry=Geometry(form,button)+" viewport="+viewport.ClientRectangle+" translated="+bounds+" scroll="+viewport.AutoScrollPosition;
+  Require(bounds.Top>=0 && bounds.Bottom<=viewport.ClientSize.Height,"Scrolled action remains out of view: "+name+geometry);
+  Require(bounds.Left>=0 && bounds.Right<=viewport.ClientSize.Width,"Scrolled action exceeds viewport: "+name+geometry);
  }
  static void MainLayout(){
-  using(var form=new CollectorForm()){
+  using(var form=new TestCollectorForm()){
    var timer=(Timer)typeof(CollectorForm).GetField("timer",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(form);timer.Stop();
    try{
     var model=(ComboBox)Find(form,"adapterModels");var device=(ComboBox)Find(form,"devices");var start=(Button)Find(form,"start");
@@ -47,10 +56,11 @@ public static class CollectorLayoutTest {
     var setBusy=typeof(CollectorForm).GetMethod("SetBusy",BindingFlags.Instance|BindingFlags.NonPublic);setBusy.Invoke(form,new object[]{true});
     Require(!start.Enabled && !device.Enabled && !model.Enabled,"Busy capture controls remain enabled");setBusy.Invoke(form,new object[]{false});
     foreach(var size in new[]{new Size(800,600),new Size(360,360)}){
-     Resize(form,size);ButtonsFit(form);var viewport=(Panel)Find(form,"collectorViewport");
-     Require(viewport.AutoScroll && !viewport.HorizontalScroll.Visible,"Main layout needs horizontal scrolling");
+     Resize(form,size);var viewport=(Panel)Find(form,"collectorViewport");viewport.AutoScrollPosition=Point.Empty;Settle(form);Snapshot(form,"collector-layout-"+size.Width+"x"+size.Height);ButtonsFit(form);
+     Require(viewport.AutoScroll && !viewport.HorizontalScroll.Visible,"Main layout needs horizontal scrolling window="+form.ClientSize+" viewport="+viewport.ClientRectangle+" scroll="+viewport.AutoScrollPosition);
      Require(Find(form,"adapterDetails").Height>=44 && Find(form,"stepNote").Height>=44,"Text entry targets too short");
      foreach(string name in new[]{"start","stop","sanitize","viewReport","upload","donate"})Reach(form,viewport,name);
+     Snapshot(form,"collector-layout-actions-"+size.Width+"x"+size.Height);
      if(size.Width==360)Require(Find(form,"stop").Top>Find(form,"start").Top,"Narrow action row failed to wrap");
     }
    }finally{timer.Dispose();}
@@ -62,7 +72,7 @@ public static class CollectorLayoutTest {
    Require(form.Options.ComputerName==Environment.MachineName,"Computer-name default changed");
    foreach(var size in new[]{new Size(800,600),new Size(360,360)}){
     Resize(form,size);ButtonsFit(form);var viewport=(Panel)Find(form,"sanitizeViewport");
-    Require(viewport.AutoScroll && !viewport.HorizontalScroll.Visible,"Sanitize layout needs horizontal scrolling");
+    Require(viewport.AutoScroll && !viewport.HorizontalScroll.Visible,"Sanitize layout needs horizontal scrolling window="+form.ClientSize+" viewport="+viewport.ClientRectangle+" scroll="+viewport.AutoScrollPosition);
     Reach(form,viewport,"createSanitizedCopy");Reach(form,viewport,"cancelSanitization");
    }
   }
@@ -73,7 +83,7 @@ public static class CollectorLayoutTest {
     Resize(form,size);ButtonsFit(form);
     foreach(string name in upload?new[]{"closeReport","uploadReviewedCopy"}:new[]{"closeReport"}){
      var button=Find(form,name);var bounds=form.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
-     Require(form.ClientRectangle.Contains(bounds),"Report action is outside the window: "+name);
+     Require(form.ClientRectangle.Contains(bounds),"Report action is outside the window: "+name+Geometry(form,button)+" translated="+bounds);
     }
    }
   }
