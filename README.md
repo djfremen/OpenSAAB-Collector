@@ -4,6 +4,8 @@ A simple Windows tool: **set up USBPcap → choose adapter model and USB device 
 privately to OpenSAAB when you choose.** No shims, driver DLL changes or background service.
 Wireshark is not required.
 
+[Join the openSAAB Discord](https://discord.gg/FxnFe8vQht) for release updates, help and testing feedback. Share capture summaries in **#testing-feedback**; keep raw captures and private vehicle data in the reviewed private upload flow.
+
 ## Capture and upload
 
 See the **[desktop app guide](desktop/README.md)** and
